@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       authenticated: true,
       admin: {
-        email: session.email,
+        username: session.username,
+        email: session.username,
         role: session.role
       }
     });

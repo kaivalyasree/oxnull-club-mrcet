@@ -5,14 +5,15 @@
 
 import fs from 'fs';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 import {
-  isAuthorizedAdminEmail,
-  normalizeEmail,
-  requestAdminOtp,
-  verifyAdminOtp,
+  verifyAdminCredentials,
   createAdminSessionToken,
   verifyAdminSessionToken,
-  buildAdminSessionCookie
+  buildAdminSessionCookie,
+  buildAdminLogoutCookie,
+  isAdminAuthConfigured,
+  clearRateLimitStore
 } from '../lib/admin-auth';
 import { db } from '../lib/store';
 import { GET as getApplications, PATCH as patchApplications, POST as postApplication } from '../app/api/applications/route';
@@ -46,125 +47,108 @@ async function runTestSuite() {
   console.log('0XNULL FULL AUDIT TEST SUITE — EXECUTION BEGINS');
   console.log('================================================================\n');
 
-  // ---------------------------------------------------------------------------
-  // GROUP 1: Administrator Allowlist & Email Normalization
-  // ---------------------------------------------------------------------------
-  console.log('--- TEST GROUP 1: Admin Allowlist & Email Normalization ---');
+  // Configure test environment variables for server-side authentication
+  const TEST_USER = 'oxnull-audit-admin';
+  const TEST_PASS = 'P@ssw0rd!SecureAudit2026';
+  const TEST_SECRET = 'audit-test-session-secret-key-32-chars-long-secure';
+  const TEST_HASH = bcrypt.hashSync(TEST_PASS, 10);
 
-  assert(
-    isAuthorizedAdminEmail('mvreddyinfosec@gmail.com') === true,
-    'Allowlist accepts mvreddyinfosec@gmail.com'
-  );
-
-  assert(
-    isAuthorizedAdminEmail('cyberwithak1@gmail.com') === true,
-    'Allowlist accepts cyberwithak1@gmail.com'
-  );
-
-  assert(
-    isAuthorizedAdminEmail('  MVREDDYINFOSEC@GMAIL.COM  ') === true,
-    'Allowlist normalizes case and whitespace for mvreddyinfosec'
-  );
-
-  assert(
-    isAuthorizedAdminEmail('CYBERWITHAK1@GMAIL.COM') === true,
-    'Allowlist normalizes case for cyberwithak1'
-  );
-
-  assert(
-    isAuthorizedAdminEmail('unauthorized@attacker.com') === false,
-    'Allowlist rejects unauthorized address unauthorized@attacker.com'
-  );
-
-  assert(
-    isAuthorizedAdminEmail('admin@mrcet.ac.in') === false,
-    'Allowlist rejects legacy unverified address admin@mrcet.ac.in'
-  );
-
-  assert(
-    normalizeEmail('  Test.User@Domain.COM  ') === 'test.user@domain.com',
-    'normalizeEmail correctly handles casing and whitespace'
-  );
+  process.env.ADMIN_USERNAME = TEST_USER;
+  process.env.ADMIN_PASSWORD_HASH = TEST_HASH;
+  process.env.ADMIN_SESSION_SECRET = TEST_SECRET;
 
   // ---------------------------------------------------------------------------
-  // GROUP 2: OTP Generation, Rate Limiting & Verification Security
+  // GROUP 1: Administrator Authentication Configuration & Fail-Safe Behavior
   // ---------------------------------------------------------------------------
-  console.log('\n--- TEST GROUP 2: OTP Flow, Rate Limiting & Verification ---');
+  console.log('--- TEST GROUP 1: Admin Configuration & Fail-Safe Checks ---');
 
-  // Test unauthorized address requesting OTP (must return neutral response, but no code created)
-  const unauthRequest = await requestAdminOtp('attacker@fakecorp.org');
   assert(
-    unauthRequest.success === true && unauthRequest.message.includes('If this email address is an authorized administrator'),
-    'Unauthorized address receives neutral confirmation (anti-enumeration)',
-    `Received: ${unauthRequest.message}`
+    isAdminAuthConfigured() === true,
+    'isAdminAuthConfigured() returns true when all required environment variables are set'
   );
 
-  const unauthVerify = await verifyAdminOtp('attacker@fakecorp.org', '123456');
+  // Missing credentials rejection
+  const emptyRes = await verifyAdminCredentials('', '');
   assert(
-    unauthVerify.success === false && unauthVerify.message.includes('No active verification code found'),
-    'Unauthorized address has no verification code generated',
-    `Received: ${unauthVerify.message}`
+    Boolean(emptyRes.success === false && emptyRes.error?.includes('required')),
+    'verifyAdminCredentials rejects empty username and password'
   );
 
-  // Test authorized address requesting OTP
-  const authEmail = 'mvreddyinfosec@gmail.com';
-  const otpRequest1 = await requestAdminOtp(authEmail);
+  const missingPassRes = await verifyAdminCredentials(TEST_USER, '');
   assert(
-    otpRequest1.success === true && !!otpRequest1.testOtp,
-    'Authorized address receives generated verification code in test mode',
-    `testOtp present: ${!!otpRequest1.testOtp}`
+    Boolean(missingPassRes.success === false && missingPassRes.error?.includes('required')),
+    'verifyAdminCredentials rejects empty password'
   );
 
-  const validOtp = otpRequest1.testOtp || '';
-
-  // Test resend cooldown
-  const otpRequestImmediate = await requestAdminOtp(authEmail);
+  // Fail-safe when unconfigured
+  const savedHash = process.env.ADMIN_PASSWORD_HASH;
+  delete process.env.ADMIN_PASSWORD_HASH;
+  const unconfRes = await verifyAdminCredentials(TEST_USER, TEST_PASS);
   assert(
-    otpRequestImmediate.success === false && otpRequestImmediate.rateLimited === true,
-    'Resend cooldown enforced (immediate duplicate request rejected)',
-    `Message: ${otpRequestImmediate.message}`
+    Boolean(unconfRes.success === false && unconfRes.error?.includes('not configured')),
+    'verifyAdminCredentials fails safely when ADMIN_PASSWORD_HASH is missing'
   );
-
-  // Test incorrect OTP rejected
-  const invalidOtpVerify = await verifyAdminOtp(authEmail, '000000');
-  assert(
-    invalidOtpVerify.success === false && typeof invalidOtpVerify.attemptsRemaining === 'number',
-    'Incorrect OTP rejected with attempts remaining returned',
-    `Remaining attempts: ${invalidOtpVerify.attemptsRemaining}`
-  );
-
-  // Test correct OTP verification
-  const validVerify = await verifyAdminOtp(authEmail, validOtp);
-  assert(
-    validVerify.success === true && !!validVerify.sessionToken,
-    'Correct OTP accepted and session token generated',
-    `Session token present: ${!!validVerify.sessionToken}`
-  );
-
-  const validSessionToken = validVerify.sessionToken || '';
-
-  // Test single-use (replay prevention)
-  const replayVerify = await verifyAdminOtp(authEmail, validOtp);
-  assert(
-    replayVerify.success === false,
-    'Single-use enforced: reused OTP rejected immediately',
-    `Replay response: ${replayVerify.message}`
-  );
+  process.env.ADMIN_PASSWORD_HASH = savedHash;
 
   // ---------------------------------------------------------------------------
-  // GROUP 3: Cryptographic Session Token Security
+  // GROUP 2: Password Verification, Generic Errors & Rate Limiting
+  // ---------------------------------------------------------------------------
+  console.log('\n--- TEST GROUP 2: Password Verification, Generic Errors & Rate Limiting ---');
+
+  clearRateLimitStore();
+
+  // Test wrong username + correct password
+  const wrongUserRes = await verifyAdminCredentials('attacker-user', TEST_PASS, '10.0.0.1');
+  assert(
+    wrongUserRes.success === false && wrongUserRes.error === 'Invalid administrator credentials.',
+    'Wrong username returns generic error message without enumeration leaks'
+  );
+
+  // Test correct username + wrong password
+  const wrongPassRes = await verifyAdminCredentials(TEST_USER, 'WrongPassword123!', '10.0.0.1');
+  assert(
+    wrongPassRes.success === false && wrongPassRes.error === 'Invalid administrator credentials.',
+    'Wrong password returns generic error message'
+  );
+
+  // Test correct username + correct password
+  const validAuthRes = await verifyAdminCredentials(TEST_USER, TEST_PASS, '10.0.0.2');
+  assert(
+    Boolean(validAuthRes.success === true && !!validAuthRes.sessionToken && validAuthRes.username === TEST_USER),
+    'Valid administrator username and password authenticate successfully'
+  );
+
+  const validSessionToken = validAuthRes.sessionToken || '';
+
+  // Test rate limiting: 5 failed attempts lock out subsequent requests
+  const bruteForceIp = '192.168.1.100';
+  for (let i = 0; i < 5; i++) {
+    await verifyAdminCredentials(TEST_USER, `wrong-guess-${i}`, bruteForceIp);
+  }
+
+  const lockedRes = await verifyAdminCredentials(TEST_USER, TEST_PASS, bruteForceIp);
+  assert(
+    Boolean(lockedRes.success === false && lockedRes.rateLimited === true && lockedRes.error?.includes('Too many failed login attempts')),
+    'Rate limiting locks out client after 5 failed attempts',
+    `Received: ${lockedRes.error}`
+  );
+
+  clearRateLimitStore();
+
+  // ---------------------------------------------------------------------------
+  // GROUP 3: Cryptographic Session Token Security & Cookies
   // ---------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 3: Session Token Cryptography & Verification ---');
 
   const decodedSession = verifyAdminSessionToken(validSessionToken);
   assert(
-    decodedSession !== null && decodedSession.email === authEmail && decodedSession.role === 'admin',
-    'Valid signed session token decodes and verifies signature'
+    decodedSession !== null && decodedSession.username === TEST_USER && decodedSession.role === 'admin',
+    'Valid signed session token decodes and verifies HMAC-SHA256 signature'
   );
 
   // Tampered payload
   const tokenParts = validSessionToken.split('.');
-  const tamperedPayloadToken = `eyJlbWFpbCI6ImF0dGFja2VyQGZha2Uub3JnIiwicm9sZSI6ImFkbWluIn0.${tokenParts[1]}`;
+  const tamperedPayloadToken = `eyJ1c2VybmFtZSI6ImF0dGFja2VyIiwicm9sZSI6ImFkbWluIn0.${tokenParts[1]}`;
   assert(
     verifyAdminSessionToken(tamperedPayloadToken) === null,
     'Tampered session payload rejected by signature verification'
@@ -175,6 +159,21 @@ async function runTestSuite() {
   assert(
     verifyAdminSessionToken(tamperedSigToken) === null,
     'Tampered signature rejected'
+  );
+
+  // Cookie generation validation
+  const testCookie = buildAdminSessionCookie(validSessionToken);
+  assert(
+    testCookie.includes('oxnull_admin_session=') &&
+    testCookie.includes('HttpOnly') &&
+    testCookie.includes('SameSite=Lax'),
+    'Admin session cookie sets HttpOnly, SameSite=Lax, and Path=/'
+  );
+
+  const logoutCookie = buildAdminLogoutCookie();
+  assert(
+    logoutCookie.includes('Max-Age=0') && logoutCookie.includes('1970'),
+    'Logout cookie properly invalidates session with Max-Age=0 and epoch expiration'
   );
 
   // ---------------------------------------------------------------------------

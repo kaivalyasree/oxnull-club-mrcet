@@ -33,24 +33,24 @@ import {
   FileCheck,
   LogOut,
   KeyRound,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'resources' | 'projects' | 'certifications' | 'activities' | 'announcements'>('overview');
 
   // Server-Verified Administrator Session State
-  const [adminSession, setAdminSession] = useState<{ email: string; role: 'admin' } | null>(null);
+  const [adminSession, setAdminSession] = useState<{ username?: string; email?: string; role: 'admin' } | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  // Email OTP Gateway State
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminStep, setAdminStep] = useState<'email' | 'code'>('email');
-  const [adminCode, setAdminCode] = useState('');
+  // Username & Password Gateway State
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [authNotice, setAuthNotice] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const [applications, setApplications] = useState<ClubApplication[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -76,15 +76,6 @@ export default function AdminPage() {
   const [newAnnTitle, setNewAnnTitle] = useState('');
   const [newAnnTag, setNewAnnTag] = useState('Official');
   const [newAnnContent, setNewAnnContent] = useState('');
-
-  // Cooldown countdown timer
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const interval = setInterval(() => {
-      setCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [cooldown]);
 
   // Check active server-side session on mount
   useEffect(() => {
@@ -184,7 +175,7 @@ export default function AdminPage() {
       date: 'Just Now',
       tag: newAnnTag,
       content: newAnnContent,
-      author: adminSession?.email || 'Administrator'
+      author: adminSession?.username || adminSession?.email || 'Administrator'
     };
     const res = await fetch('/api/announcements', {
       method: 'POST',
@@ -204,81 +195,39 @@ export default function AdminPage() {
     loadAllData();
   };
 
-  // Server-Side Two-Factor Email OTP Dispatch Handler
-  const handleSendAdminCode = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setAuthError(null);
-    setAuthNotice(null);
-
-    const trimmedEmail = adminEmail.trim().toLowerCase();
-    if (!trimmedEmail) {
-      setAuthError('Please enter an administrator email address.');
-      return;
-    }
-
-    setIsVerifying(true);
-    try {
-      const res = await fetch('/api/admin/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAdminStep('code');
-        setAuthNotice(data.message);
-        setCooldown(60);
-      } else {
-        setAuthError(data.error || 'Failed to dispatch verification code.');
-        if (data.cooldownSeconds) {
-          setCooldown(data.cooldownSeconds);
-        }
-      }
-    } catch {
-      setAuthError('Network error while requesting verification code. Please check connectivity.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // Server-Side Two-Factor Email OTP Verification Handler
-  const handleVerifyAdminOtp = async (e: React.FormEvent) => {
+  // Server-Side Username & Password Login Handler
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
-    const code = adminCode.trim();
-    if (!code) {
-      setAuthError('Please enter the 6-digit verification code.');
-      return;
-    }
-    if (code.length !== 6) {
-      setAuthError('Verification code must be exactly 6 digits.');
+    const user = adminUsername.trim();
+    const pass = adminPassword;
+
+    if (!user || !pass) {
+      setAuthError('Please enter both administrator username and password.');
       return;
     }
 
-    setIsVerifying(true);
+    setIsAuthenticating(true);
     try {
-      const res = await fetch('/api/admin/auth/verify-otp', {
+      const res = await fetch('/api/admin/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: adminEmail.trim().toLowerCase(),
-          otp: code
-        })
+        body: JSON.stringify({ username: user, password: pass })
       });
       const data = await res.json();
-      if (data.success && data.admin) {
+      if (res.ok && data.success && data.admin) {
         setAdminSession(data.admin);
-        setAuthNotice(null);
+        setAdminPassword('');
         setAuthError(null);
         loadAllData();
       } else {
-        setAuthError(data.error || 'Verification code failed or expired.');
+        setAuthError(data.error || 'Invalid administrator credentials.');
       }
     } catch {
-      setAuthError('Network error during verification. Please try again.');
+      setAuthError('Network error during authentication. Please check connectivity.');
     } finally {
-      setIsVerifying(false);
+      setIsAuthenticating(false);
     }
   };
 
@@ -290,10 +239,8 @@ export default function AdminPage() {
       console.error(e);
     }
     setAdminSession(null);
-    setAdminStep('email');
-    setAdminCode('');
-    setAdminEmail('');
-    setAuthNotice(null);
+    setAdminUsername('');
+    setAdminPassword('');
     setAuthError(null);
   };
 
@@ -311,7 +258,7 @@ export default function AdminPage() {
     );
   }
 
-  // If user is not authenticated as admin, render the secure Administrator Portal Verification Gate
+  // If user is not authenticated as admin, render the secure Administrator Portal Login Gate
   if (!adminSession) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center py-16 px-4">
@@ -326,7 +273,7 @@ export default function AdminPage() {
             </span>
             <h2 className="text-2xl font-black text-[#151417]">Admin Portal Gateway</h2>
             <p className="text-xs text-[#645E6D] leading-relaxed pt-1">
-              Direct administrative access is restricted to verified club leadership with single-use two-factor email authorization.
+              Direct administrative access is restricted to verified club leadership. Enter your administrator credentials below.
             </p>
           </div>
 
@@ -336,106 +283,63 @@ export default function AdminPage() {
             </div>
           )}
 
-          {authNotice && (
-            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs text-left">
-              ✓ {authNotice}
+          <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#151417] mb-1.5">
+                Administrator Username
+              </label>
+              <input
+                type="text"
+                value={adminUsername}
+                onChange={(e) => setAdminUsername(e.target.value)}
+                placeholder="Admin username"
+                required
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect="off"
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] focus:outline-none focus:ring-2 focus:ring-[#C89D3C]"
+              />
             </div>
-          )}
 
-          {adminStep === 'email' ? (
-            <form onSubmit={handleSendAdminCode} className="space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#151417] mb-1.5">
-                  Authorized Administrator Email
-                </label>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#151417] mb-1.5">
+                Administrator Password
+              </label>
+              <div className="relative">
                 <input
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="admin@example.com"
+                  type={showPassword ? 'text' : 'password'}
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="••••••••••••"
                   required
-                  autoFocus
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] focus:outline-none focus:ring-2 focus:ring-[#C89D3C]"
+                  className="w-full pl-4 pr-11 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] focus:outline-none focus:ring-2 focus:ring-[#C89D3C]"
                 />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isVerifying || cooldown > 0}
-                className="w-full py-3 rounded-xl bg-[#151417] text-[#FAF7F2] text-xs font-bold uppercase tracking-wider hover:bg-[#2A2830] transition-colors border border-[#D4AF37]/50 shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isVerifying
-                  ? 'Verifying Authorization...'
-                  : cooldown > 0
-                  ? `Resend Available in ${cooldown}s`
-                  : 'Dispatch One-Time Code'}
-              </button>
-
-              <div className="text-center pt-2">
-                <Link href="/" className="text-xs font-semibold text-[#8A8592] hover:text-[#151417] transition-colors">
-                  ← Return to Public Website
-                </Link>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyAdminOtp} className="space-y-4 text-left">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#151417]">
-                    6-Digit One-Time Code
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminStep('email');
-                      setAuthError(null);
-                      setAuthNotice(null);
-                      setAdminCode('');
-                    }}
-                    className="text-[11px] text-[#967223] hover:underline"
-                  >
-                    Change Email
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={adminCode}
-                  onChange={(e) => setAdminCode(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="000000"
-                  required
-                  autoFocus
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-center text-xl font-mono tracking-[0.3em] font-bold text-[#151417] focus:outline-none focus:ring-2 focus:ring-[#C89D3C]"
-                />
-                <p className="text-[11px] text-[#8A8592] mt-1 text-center">
-                  Verification code expires in 5 minutes
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isVerifying || adminCode.length !== 6}
-                className="w-full py-3 rounded-xl bg-[#151417] text-[#FAF7F2] text-xs font-bold uppercase tracking-wider hover:bg-[#2A2830] transition-colors border border-[#D4AF37]/50 shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isVerifying ? 'Authenticating...' : 'Verify Code & Access Hub'}
-              </button>
-
-              <div className="pt-2 flex items-center justify-between text-xs">
                 <button
                   type="button"
-                  disabled={cooldown > 0 || isVerifying}
-                  onClick={() => handleSendAdminCode()}
-                  className="text-[#967223] hover:underline disabled:opacity-40 flex items-center gap-1 cursor-pointer"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A8592] hover:text-[#151417] p-1 transition-colors cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
                 >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>{cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend Code'}</span>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
-                <Link href="/" className="text-[#8A8592] hover:text-[#151417]">
-                  Cancel
-                </Link>
               </div>
-            </form>
-          )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isAuthenticating}
+              className="w-full py-3 rounded-xl bg-[#151417] text-[#FAF7F2] text-xs font-bold uppercase tracking-wider hover:bg-[#2A2830] transition-colors border border-[#D4AF37]/50 shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              {isAuthenticating ? 'Authenticating...' : 'Sign In to Admin Hub'}
+            </button>
+
+            <div className="text-center pt-2">
+              <Link href="/" className="text-xs font-semibold text-[#8A8592] hover:text-[#151417] transition-colors">
+                ← Return to Public Website
+              </Link>
+            </div>
+          </form>
         </div>
       </div>
     );
@@ -457,7 +361,7 @@ export default function AdminPage() {
               </span>
             </div>
             <p className="text-xs text-[#645E6D] mt-0.5">
-              Authenticated Session: <strong className="text-[#151417]">{adminSession?.email}</strong>
+              Authenticated Session: <strong className="text-[#151417]">{adminSession?.username || adminSession?.email}</strong>
             </p>
           </div>
         </div>
