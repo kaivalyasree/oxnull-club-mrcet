@@ -1,0 +1,374 @@
+{
+  "domains": [
+    {
+      "id": "d1",
+      "slug": "red-blue-team",
+      "number": "01",
+      "name": "Red & Blue Team",
+      "badge": "Offence & Defence",
+      "tagline": "Two perspectives, one discipline — attack to understand, defend to protect. Every exercise is conducted in controlled labs with documented ethical boundaries.",
+      "overview": "The Red & Blue Team domain bridges adversarial attack simulations with institutional defense. Members practice both offensive penetration testing techniques to uncover attack vectors and defensive operational telemetry to isolate intrusions, engineer detection rules, and execute incident response drills.",
+      "focusAreas": [
+        "Ethical hacking basics & scoped rules of engagement",
+        "Vulnerability assessment & CVE vulnerability mapping",
+        "Web application security (OWASP Top 10 vulnerabilities)",
+        "Reconnaissance techniques (Passive & Active discovery)",
+        "Penetration testing execution frameworks",
+        "Controlled attack simulations & privilege escalation",
+        "Security monitoring & perimeter telemetry analysis",
+        "SIEM configuration & log analysis (Splunk, Elastic)",
+        "Threat detection rules (YARA, Sigma)",
+        "Incident response triage & forensic stabilization"
+      ],
+      "subTracks": [
+        {
+          "name": "Red Team (Offensive Practice)",
+          "description": "Thinking from the attacker position — finding architectural and implementation weaknesses before threat actors exploit them.",
+          "items": [
+            "Ethical hacking fundamentals",
+            "Vulnerability assessment",
+            "Web application security",
+            "Reconnaissance techniques",
+            "Penetration testing methodology",
+            "Controlled attack simulation"
+          ]
+        },
+        {
+          "name": "Blue Team (Defensive Operations)",
+          "description": "Watching, detecting, responding — building the organizational muscle that shields mission-critical systems.",
+          "items": [
+            "Security monitoring & alert correlation",
+            "SIEM & log analysis pipelines",
+            "Network perimeter defence & egress filtering",
+            "Threat detection rules engineering",
+            "Incident response drills & containment",
+            "Forensic triage & root-cause isolation"
+          ]
+        }
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Foundational Reconnaissance & Lab Setup",
+          "description": "Establish isolated Kali Linux & target VMs. Master Nmap, port scanning, basic HTTP inspection, and packet flows.",
+          "deliverable": "Complete basic TryHackMe / HackTheBox pre-security rooms and write a reproducible lab verification memo."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "Web Application Pentesting & Perimeter Defense",
+          "description": "Analyze SQL injection, cross-site scripting (XSS), authentication bypasses, and configure Suricata IDS rules.",
+          "deliverable": "Publish a scoped penetration test report and matching Sigma defensive detection rules for an internal vulnerable service."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Full Attack-Defence Simulation & Active Directory",
+          "description": "Participate in live team vs team scenarios, Kerberoasting, golden ticket attacks, and automated endpoint triage.",
+          "deliverable": "Lead an internal 0XNULL CTF attack-defence session with automated post-incident debrief."
+        }
+      ],
+      "activities": [
+        "Collegiate CTF Competitions (Capture The Flag)",
+        "Structured Attack-Defence Labs",
+        "Live Fire Incident Drills",
+        "Post-Mortem & Debriefing Roundtables"
+      ]
+    },
+    {
+      "id": "d2",
+      "slug": "digital-forensics",
+      "number": "02",
+      "name": "Digital Forensics",
+      "badge": "Investigation & Artefacts",
+      "tagline": "Reconstructing events from artefacts — disk, memory and network traces. The discipline of answering 'what happened' with evidence, not assumption.",
+      "overview": "Digital Forensics provides the rigorous methodology required to examine compromised storage media, memory dumps, and protocol traces. Members learn chain of custody protocols, volatile memory analysis, and filesystem timelines to piece together digital crime scenes.",
+      "focusAreas": [
+        "Digital evidence handling & legal chain of custody",
+        "Disk forensics & RAW / E01 filesystem image carving",
+        "Network forensics & deep protocol trace inspection",
+        "Incident investigation & post-breach reconstruction",
+        "File systems analysis (NTFS $MFT, EXT4, APFS)",
+        "Memory forensics & volatile payload extraction",
+        "Log correlation & timeline triage synthesis"
+      ],
+      "toolsCovered": [
+        {
+          "name": "Wireshark",
+          "description": "Packet capture and network traffic protocol analysis to trace malicious C2 communications and payload exfiltration."
+        },
+        {
+          "name": "Autopsy",
+          "description": "Disk, raw image, and filesystem investigation platform for automated artefact indexing, deleted file carving, and timeline analysis."
+        },
+        {
+          "name": "Volatility",
+          "description": "Volatile memory artefact extraction and malware analysis framework for analyzing process trees, injected DLLs, and memory pools."
+        }
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Artefact Acquisition & Hex Analysis",
+          "description": "Learn evidence hashing (SHA-256), write-blockers, disk cloning, and hex examination of common file signatures.",
+          "deliverable": "Verify and document a cryptographic disk image integrity verification report."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "Network & Memory Incident Extraction",
+          "description": "Dissect PCAP files for credentials, DNS tunneling, and inspect memory dumps using Volatility 3 to spot hidden threads.",
+          "deliverable": "Deliver an incident timeline report detailing a simulated employee data-exfiltration breach."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Enterprise Incident Response & Anti-Forensics",
+          "description": "Counter timestomping, rootkits, memory injection, and reconstruct lateral movement across Windows event logs.",
+          "deliverable": "Publish a forensic case walkthrough with evidence artefacts presented in court-admissible format."
+        }
+      ],
+      "activities": [
+        "Forensic Mystery Challenges",
+        "Memory Dump Autopsies",
+        "Network Packet Sleuthing Sessions",
+        "Artefact Carving Competitions"
+      ]
+    },
+    {
+      "id": "d3",
+      "slug": "cryptography",
+      "number": "03",
+      "name": "Cryptography",
+      "badge": "Mathematical Trust",
+      "tagline": "The mathematical foundation of all digital trust. Encrypting data, authenticating identity, and preserving privacy across untrusted networks.",
+      "overview": "Cryptography examines symmetric algorithms, asymmetric public-key systems, hashing primitives, and modern zero-knowledge proofs. Members audit crypto implementations and understand the transition to Post-Quantum Cryptography (PQC).",
+      "focusAreas": [
+        "Symmetric encryption (AES-256, ChaCha20-Poly1305)",
+        "Asymmetric key exchange (RSA, ECC, Diffie-Hellman)",
+        "Cryptographic hash functions (SHA-2, SHA-3, BLAKE3)",
+        "Digital signatures & Public Key Infrastructure (PKI)",
+        "Zero-knowledge proofs (ZK-SNARKs) & secure computation",
+        "Post-quantum cryptography (ML-KEM, ML-DSA NIST standards)",
+        "Attacking weak PRNGs and side-channel timing analysis"
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Classical Ciphers & Modular Arithmetic",
+          "description": "Understand substitution, transposition, modular arithmetic, Euler's totient theorem, and XOR properties.",
+          "deliverable": "Build a CLI utility implementing basic symmetric stream ciphers and frequency analysis."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "Modern Block Ciphers & TLS Handshakes",
+          "description": "Dissect AES Galois/Counter Mode (GCM), authenticated encryption with associated data (AEAD), and X.509 certificate chains.",
+          "deliverable": "Implement an end-to-end encrypted chat channel with forward secrecy in Python or Go."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Post-Quantum Migration & Zero Knowledge",
+          "description": "Study lattice-based cryptography, NIST FIPS 203 ML-KEM, and circuit generation for zero-knowledge proofs.",
+          "deliverable": "Author a research paper or implementation demo comparing classical vs lattice-based key exchange overhead."
+        }
+      ],
+      "activities": [
+        "Cryptanalysis Challenge Sprints",
+        "Paper Reading Circles",
+        "Implementation Audits",
+        "Crypto Math Workshops"
+      ]
+    },
+    {
+      "id": "d4",
+      "slug": "cloud-security",
+      "number": "04",
+      "name": "Cloud Security",
+      "badge": "Infrastructure & IAM",
+      "tagline": "Securing ephemeral infrastructure, containerized workloads, and identity perimeters across hyper-scale cloud environments.",
+      "overview": "Cloud Security focuses on multi-cloud posture, Identity and Access Management (IAM), container isolation, serverless defense, and Infrastructure as Code (IaC) auditing. Members learn to design immutable and compliant architectures on AWS, Azure, and GCP.",
+      "focusAreas": [
+        "Cloud identity & access management (Least Privilege IAM)",
+        "Infrastructure as Code security (Terraform, CloudFormation)",
+        "Container security & Docker daemon hardening",
+        "Kubernetes cluster defense & admission controllers",
+        "Cloud security posture management (CSPM)",
+        "Cloud-native detection & runtime threat monitoring (eBPF)",
+        "Serverless security architectures (AWS Lambda, Cloud Functions)"
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Cloud Fundamentals & Identity Boundaries",
+          "description": "Master AWS/GCP core networking (VPC, subnets, route tables) and construct strict IAM role trust policies.",
+          "deliverable": "Provision a securely isolated VPC with zero public ingress and hardened bastion access via Terraform."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "Container Hardening & eBPF Telemetry",
+          "description": "Audit container images with Trivy, lock down rootless Docker runtimes, and monitor container calls via Falco.",
+          "deliverable": "Deploy a multi-tier containerized app with enforced seccomp profiles and automated CI/CD vulnerability gates."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Multi-Account Governance & Cloud Incident Triage",
+          "description": "Automate AWS Organizations SCP boundaries, analyze GuardDuty/CloudTrail logs, and isolate compromised instances.",
+          "deliverable": "Conduct an automated simulated cloud breach scenario and author an automated Lambda-driven remediation pipeline."
+        }
+      ],
+      "activities": [
+        "CloudGoat Vulnerable AWS Range Drills",
+        "Terraform Hardening Labs",
+        "Kubernetes Attack-Defense Scrimmages",
+        "Cloud Architecture Reviews"
+      ]
+    },
+    {
+      "id": "d5",
+      "slug": "security-architecture",
+      "number": "05",
+      "name": "Security Architecture",
+      "badge": "Defensible Systems",
+      "tagline": "Designing systems that are secure by default. Threat modeling, zero-trust perimeters, and defense-in-depth across enterprise scale.",
+      "overview": "Security Architecture applies structured frameworks to eliminate structural vulnerabilities before code is written. Members master STRIDE threat modeling, network microsegmentation, secure API gateways, and defense-in-depth topologies.",
+      "focusAreas": [
+        "STRIDE & PASTA threat modeling methodologies",
+        "Zero Trust Architecture (NIST SP 800-207 guidelines)",
+        "Enterprise network microsegmentation & firewalls",
+        "Secure software development lifecycle (SSDLC)",
+        "API security & OAuth 2.0 / OpenID Connect flows",
+        "Data classification, tokenization & encryption at rest",
+        "Resilient perimeter topologies & fail-safe designs"
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Threat Modeling & Security Perimeters",
+          "description": "Map data flow diagrams (DFDs), identify trust boundaries, and catalog threats using the STRIDE methodology.",
+          "deliverable": "Complete an end-to-end threat model document for an e-commerce microservices platform."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "Zero Trust Perimeters & Mutual TLS",
+          "description": "Design identity-aware proxies, mutual TLS service-to-service authentication, and attribute-based access control (ABAC).",
+          "deliverable": "Implement an Envoy/Istio service mesh enforcing mTLS and cryptographic identity validation across microservices."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Enterprise Security Blueprinting",
+          "description": "Architect disaster recovery topologies, cross-datacenter perimeter failovers, and compliance-certified landing zones.",
+          "deliverable": "Deliver an enterprise-grade reference architecture blueprint presented in executive review format."
+        }
+      ],
+      "activities": [
+        "System Architecture War Games",
+        "STRIDE Threat Modeling Sessions",
+        "Design Review Panels",
+        "Zero-Trust Lab Builds"
+      ]
+    },
+    {
+      "id": "d6",
+      "slug": "awareness",
+      "number": "06",
+      "name": "Awareness",
+      "badge": "Human Factor & Advocacy",
+      "tagline": "Defending the human element. Combatting social engineering, educating the community, and promoting security culture across organizations.",
+      "overview": "Security awareness transforms humans from targets into the first line of defense. Members analyze deceptive phishing techniques, social engineering psychology, digital privacy rights, and translate complex technical vulnerabilities into actionable campus education.",
+      "focusAreas": [
+        "Phishing & spear-phishing attack mechanics",
+        "Social engineering psychology & credential harvesting",
+        "Digital privacy, smartphone hygiene & OSINT exposure",
+        "Creating effective organizational security training",
+        "Incident reporting culture & emergency escalation",
+        "Cyber hygiene campaigns & community workshops",
+        "Translating security standards for non-technical users"
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Social Engineering Anatomy & Phishing Signals",
+          "description": "Deconstruct deceptive email headers, malicious URL shortening, QR code phishing (quishing), and spoofed MFA prompts.",
+          "deliverable": "Design a high-fidelity educational guide exposing the top 5 phishing vectors targeting university students."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "Awareness Campaign Engineering",
+          "description": "Plan and deploy simulated, ethical awareness exercises and measure reporting turnaround times across student cohorts.",
+          "deliverable": "Run a controlled campus cyber hygiene audit and publish statistical insights with recommendations."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Executive Communication & Public Policy",
+          "description": "Advocate for institutional cybersecurity policies, author incident notification briefs, and deliver keynote briefings.",
+          "deliverable": "Lead a public cybersecurity literacy summit for faculty, students, and local community members."
+        }
+      ],
+      "activities": [
+        "Phishing Dissection Labs",
+        "Campus Security Drives",
+        "Interactive Social Engineering Debates",
+        "Digital Self-Defense Workshops"
+      ]
+    },
+    {
+      "id": "d7",
+      "slug": "explore",
+      "number": "07",
+      "name": "Explore",
+      "badge": "Emerging Frontiers",
+      "tagline": "The open frontier of cybersecurity. Investigating AI-assisted threats, IoT/hardware hacking, automotive bus security, and future vectors.",
+      "overview": "The Explore track fosters curiosity into emerging technology frontiers that do not fit into conventional domain boundaries. Members analyze AI adversarial evasion, hardware side-channel attacks, radio frequency hacking (SDR), and smart device telemetry.",
+      "focusAreas": [
+        "AI security & prompt injection / adversarial evasion",
+        "Hardware security & UART/JTAG debugging extraction",
+        "Software Defined Radio (SDR) & RF signal analysis",
+        "IoT firmware reverse engineering & binary analysis",
+        "Automotive CAN bus security & telemetry injection",
+        "Biometric authentication & physical bypass testing",
+        "Novel attack surfaces in quantum & decentralized systems"
+      ],
+      "learningPathway": [
+        {
+          "stage": "Beginner",
+          "title": "Hardware Interfaces & Firmware Extraction",
+          "description": "Interface with microcontrollers via UART, read SPI flash chips, and dump firmware binaries using binwalk.",
+          "deliverable": "Extract and analyze the filesystem from a consumer smart device firmware image in a lab environment."
+        },
+        {
+          "stage": "Intermediate",
+          "title": "RF Analysis & AI Model Inversion",
+          "description": "Capture sub-GHz radio transmissions with HackRF/RTL-SDR and test adversarial perturbation attacks on machine learning classifiers.",
+          "deliverable": "Build an SDR replay experiment demonstrating rolling code vs fixed code vulnerability in remote keyless systems."
+        },
+        {
+          "stage": "Advanced",
+          "title": "Autonomous Exploitation & Novel Research",
+          "description": "Design custom fuzzers, explore LLM-assisted vulnerability discovery, and research zero-day primitives in IoT stacks.",
+          "deliverable": "Publish a novel research advisory detailing a newly discovered vulnerability in an open-source hardware/IoT platform."
+        }
+      ],
+      "activities": [
+        "Hardware Hacking Villages",
+        "SDR Signal Capture Sprints",
+        "Adversarial AI Competitions",
+        "Emerging Tech Roundtables"
+      ]
+    }
+  ],
+  "resources": [],
+  "certifications": [],
+  "projects": [],
+  "activities": [],
+  "announcements": [],
+  "applications": [],
+  "userProgress": {
+    "usr-google-1792083297968": {
+      "userId": "usr-google-1792083297968",
+      "enrolledDomains": [],
+      "savedResourceIds": [],
+      "completedResourceIds": [],
+      "trackedCertificationIds": [],
+      "activeProjectIds": [],
+      "rsvpdActivityIds": [],
+      "completedFoundationIds": [],
+      "notes": ""
+    }
+  }
+}
