@@ -122,7 +122,11 @@ export const db = {
   // Domains (Required structural foundational configuration)
   getDomains(): Domain[] {
     const store = ensureDataFile();
-    return store.domains && store.domains.length > 0 ? store.domains : DOMAINS;
+    const list = store.domains && store.domains.length > 0 ? store.domains : DOMAINS;
+    return list.map((storedItem) => {
+      const base = DOMAINS.find((d) => d.slug === storedItem.slug || d.id === storedItem.id);
+      return base ? { ...base, ...storedItem } : storedItem;
+    });
   },
   getDomainBySlug(slug: string): Domain | undefined {
     const store = ensureDataFile();

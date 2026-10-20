@@ -697,8 +697,8 @@ export default function AdminPage() {
     setDomFormName(dom.name);
     setDomFormBadge(dom.badge);
     setDomFormTagline(dom.tagline);
-    setDomFormOverview(dom.overview);
-    setDomFormFocusAreas(dom.focusAreas.join('\n'));
+    setDomFormOverview(dom.overview || '');
+    setDomFormFocusAreas((dom.focusAreas || []).join('\n'));
     setDomFormError(null);
   };
 
@@ -1861,10 +1861,10 @@ export default function AdminPage() {
 
                     <div className="pt-2">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1">
-                        Focus Areas ({dom.focusAreas.length})
+                        Focus Areas ({(dom.focusAreas || []).length})
                       </span>
                       <div className="flex flex-wrap gap-1.5">
-                        {dom.focusAreas.map((fa, i) => (
+                        {(dom.focusAreas || []).map((fa, i) => (
                           <span
                             key={i}
                             className="px-2 py-0.5 rounded text-[11px] bg-white border border-[#E8D8C3] text-[#151417]"
