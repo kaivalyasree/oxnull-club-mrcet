@@ -27,10 +27,12 @@ export default function ActivitiesPage() {
   }, []);
 
   const filtered = activities.filter((act) => {
-    if (filterType !== 'all' && act.type.toLowerCase() !== filterType.toLowerCase()) {
+    const actType = act.type || act.format || '';
+    const actLevel = act.level || act.participants || '';
+    if (filterType !== 'all' && actType.toLowerCase() !== filterType.toLowerCase()) {
       return false;
     }
-    if (filterLevel !== 'all' && act.level.toLowerCase() !== filterLevel.toLowerCase()) {
+    if (filterLevel !== 'all' && actLevel.toLowerCase() !== filterLevel.toLowerCase()) {
       return false;
     }
     return true;

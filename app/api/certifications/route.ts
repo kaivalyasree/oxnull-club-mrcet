@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
+import { safeRevalidate } from '@/lib/cache';
 import { db } from '@/lib/store';
 import { verifyAdminSession } from '@/lib/admin-auth';
+import { getServerSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
+import type { Certification } from '@/lib/data';
 
 function isValidUrl(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== 'string') return false;
@@ -25,6 +28,46 @@ export async function GET(request: Request) {
 
     const publishedOnly = !isAdmin || !all;
 
+    // 1. If Supabase is configured, query certifications
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getServerSupabaseClient();
+        if (supabase) {
+          let query = supabase.from('certifications').select('*');
+          if (publishedOnly) {
+            query = query.eq('is_published', true);
+          }
+          if (domainId) {
+            query = query.eq('domain_id', domainId);
+          }
+
+          const { data, error } = await query.order('created_at', { ascending: false });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            const mapped: Certification[] = data.map((row: any) => ({
+              id: row.id,
+              name: row.title || row.name,
+              provider: row.provider,
+              domainId: row.domain_id || undefined,
+              domainName: row.domain_name || undefined,
+              level: row.level || 'Intermediate',
+              cost: row.cost || 'Paid',
+              url: row.url || '#',
+              description: row.description || '',
+              examCode: row.exam_code || undefined,
+              isPublished: row.is_published !== false,
+              tags: Array.isArray(row.tags) ? row.tags : [],
+              createdAt: row.created_at,
+              updatedAt: row.updated_at
+            }));
+            return NextResponse.json({ success: true, data: mapped });
+          }
+        }
+      } catch (sbErr) {
+        console.warn('[OXNULL] Supabase fetch certifications fallback to local store', sbErr);
+      }
+    }
+
+    // 2. Fallback to local store
     const certs = db.getCertifications({
       publishedOnly,
       domainId: domainId || undefined
@@ -61,6 +104,34 @@ export async function POST(request: Request) {
       );
     }
 
+    const certId = `c-${Date.now()}`;
+    const isPublished = body.isPublished !== false;
+
+    // 1. Transactional persistence in Supabase if configured
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getServerSupabaseClient();
+        if (supabase) {
+          await supabase.from('certifications').insert({
+            id: certId,
+            title: body.name.trim(),
+            provider: body.provider.trim(),
+            domain_id: body.domainId,
+            level: body.level || 'Intermediate',
+            cost: body.cost?.trim() || 'Paid',
+            url: body.url?.trim() || '#',
+            description: body.description?.trim() || '',
+            exam_code: body.examCode || body.code || null,
+            is_published: isPublished,
+            tags: Array.isArray(body.tags) ? body.tags : []
+          });
+        }
+      } catch (sbErr) {
+        console.warn('[OXNULL] Supabase insert certification fallback to local store', sbErr);
+      }
+    }
+
+    // 2. Persist to local store
     const created = db.addCertification({
       name: body.name.trim(),
       provider: body.provider.trim(),
@@ -70,9 +141,17 @@ export async function POST(request: Request) {
       cost: body.cost?.trim() || 'Paid',
       url: body.url?.trim() || '#',
       description: body.description?.trim() || '',
-      isPublished: body.isPublished !== false,
+      isPublished,
       tags: Array.isArray(body.tags) ? body.tags : []
     });
+
+    // 3. Cache revalidation
+    try {
+      safeRevalidate('/certifications');
+      safeRevalidate('/domains');
+    } catch (revErr) {
+      console.warn('Revalidation warning:', revErr);
+    }
 
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (error) {
@@ -100,6 +179,28 @@ export async function PUT(request: Request) {
       if (!updated) {
         return NextResponse.json({ success: false, error: 'Certification not found' }, { status: 404 });
       }
+
+      if (isSupabaseConfigured) {
+        try {
+          const supabase = getServerSupabaseClient();
+          if (supabase) {
+            await supabase
+              .from('certifications')
+              .update({ is_published: updated.isPublished, updated_at: new Date().toISOString() })
+              .eq('id', body.id);
+          }
+        } catch (sbErr) {
+          console.warn('[OXNULL] Supabase toggle-publish certification fallback', sbErr);
+        }
+      }
+
+      try {
+        safeRevalidate('/certifications');
+        safeRevalidate('/domains');
+      } catch (revErr) {
+        console.warn('Revalidation warning:', revErr);
+      }
+
       return NextResponse.json({ success: true, data: updated });
     }
 
@@ -110,10 +211,41 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getServerSupabaseClient();
+        if (supabase) {
+          const sbPayload: any = { updated_at: new Date().toISOString() };
+          if (body.name) sbPayload.title = body.name.trim();
+          if (body.provider) sbPayload.provider = body.provider.trim();
+          if (body.domainId !== undefined) sbPayload.domain_id = body.domainId;
+          if (body.level) sbPayload.level = body.level;
+          if (body.cost !== undefined) sbPayload.cost = body.cost;
+          if (body.url) sbPayload.url = body.url.trim();
+          if (body.description !== undefined) sbPayload.description = body.description.trim();
+          if (body.examCode !== undefined) sbPayload.exam_code = body.examCode;
+          if (Array.isArray(body.tags)) sbPayload.tags = body.tags;
+          if (body.isPublished !== undefined) sbPayload.is_published = body.isPublished;
+
+          await supabase.from('certifications').update(sbPayload).eq('id', body.id);
+        }
+      } catch (sbErr) {
+        console.warn('[OXNULL] Supabase update certification fallback', sbErr);
+      }
+    }
+
     const updated = db.updateCertification(body.id, body);
     if (!updated) {
       return NextResponse.json({ success: false, error: 'Certification not found' }, { status: 404 });
     }
+
+    try {
+      safeRevalidate('/certifications');
+      safeRevalidate('/domains');
+    } catch (revErr) {
+      console.warn('Revalidation warning:', revErr);
+    }
+
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to update certification' }, { status: 500 });
@@ -135,7 +267,27 @@ export async function DELETE(request: Request) {
     if (!id) {
       return NextResponse.json({ success: false, error: 'Certification ID required' }, { status: 400 });
     }
+
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getServerSupabaseClient();
+        if (supabase) {
+          await supabase.from('certifications').delete().eq('id', id);
+        }
+      } catch (sbErr) {
+        console.warn('[OXNULL] Supabase delete certification fallback', sbErr);
+      }
+    }
+
     const deleted = db.deleteCertification(id);
+
+    try {
+      safeRevalidate('/certifications');
+      safeRevalidate('/domains');
+    } catch (revErr) {
+      console.warn('Revalidation warning:', revErr);
+    }
+
     return NextResponse.json({ success: deleted });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to delete certification' }, { status: 500 });

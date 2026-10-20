@@ -26,7 +26,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const domain = DOMAINS.find((d) => d.slug === slug);
+  const domain = db.getDomainBySlug(slug) || DOMAINS.find((d) => d.slug === slug);
   if (!domain) return { title: 'Domain Not Found | 0XNULL' };
 
   return {
@@ -41,7 +41,7 @@ export default async function DomainDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const domain = DOMAINS.find((d) => d.slug === slug);
+  const domain = db.getDomainBySlug(slug) || DOMAINS.find((d) => d.slug === slug);
 
   if (!domain) {
     notFound();
@@ -91,7 +91,7 @@ export default async function DomainDetailPage({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {domain.focusAreas.map((area, idx) => (
+            {(domain.focusAreas || []).map((area, idx) => (
               <div
                 key={idx}
                 className="glass-card rounded-2xl p-4 flex items-start gap-3 border-[#E8D8C3]"
@@ -249,7 +249,7 @@ export default async function DomainDetailPage({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {domain.learningPathway.map((step, idx) => (
+            {(domain.learningPathway || []).map((step, idx) => (
               <div
                 key={idx}
                 className="glass-card rounded-3xl p-6 flex flex-col justify-between border-[#E8D8C3]"

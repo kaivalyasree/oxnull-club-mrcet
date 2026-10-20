@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { LEARNING_SUBJECTS } from '@/lib/data';
+import { LEARNING_SUBJECTS, LearningSubject } from '@/lib/data';
 import { useAuth } from '@/lib/auth-context';
 import {
   CheckCircle,
@@ -19,6 +19,18 @@ import {
 
 export default function LearnPage() {
   const { progress, toggleCompleteFoundation } = useAuth();
+  const [subjects, setSubjects] = useState<LearningSubject[]>(LEARNING_SUBJECTS);
+
+  useEffect(() => {
+    fetch('/api/learning-subjects')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setSubjects(data.data);
+        }
+      })
+      .catch((err) => console.error('Failed to load learning subjects', err));
+  }, []);
 
   const workflowSteps = [
     { step: '01', title: 'START HERE', subtitle: 'Join 0XNULL cohort and assess systems baseline' },
@@ -47,9 +59,9 @@ export default function LearnPage() {
   };
 
   const completedCount = progress.completedFoundationIds.filter((id) =>
-    LEARNING_SUBJECTS.some((s) => s.id === id || s.slug === id)
+    subjects.some((s) => s.id === id || s.slug === id)
   ).length;
-  const progressPercent = Math.round((completedCount / LEARNING_SUBJECTS.length) * 100);
+  const progressPercent = Math.round((completedCount / (subjects.length || 1)) * 100);
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 max-w-7xl mx-auto space-y-16">
@@ -70,7 +82,7 @@ export default function LearnPage() {
           <div className="flex items-center justify-between text-xs font-semibold mb-2">
             <span className="text-[#151417]">Your Foundation Mastery</span>
             <span className="text-[#967223]">
-              {completedCount} of {LEARNING_SUBJECTS.length} Complete ({progressPercent}%)
+              {completedCount} of {subjects.length} Complete ({progressPercent}%)
             </span>
           </div>
           <div className="w-full h-2.5 rounded-full bg-[#E8D8C3]/50 overflow-hidden">
@@ -133,7 +145,7 @@ export default function LearnPage() {
         </div>
 
         <div className="space-y-6">
-          {LEARNING_SUBJECTS.map((subject) => {
+          {subjects.map((subject) => {
             const Icon = getSubjectIcon(subject.slug);
             const isCompleted =
               progress.completedFoundationIds.includes(subject.id) ||

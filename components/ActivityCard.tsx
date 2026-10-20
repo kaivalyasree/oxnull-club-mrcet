@@ -13,6 +13,10 @@ export default function ActivityCard({ activity }: ActivityCardProps) {
   const { progress, toggleRsvpActivity } = useAuth();
   const isRsvpd = progress.rsvpdActivityIds.includes(activity.id);
 
+  const actType = activity.type || activity.format || 'Technical';
+  const cadenceText = activity.cadence || activity.frequency || 'Weekly';
+  const levelText = activity.level || activity.participants || 'All Levels';
+
   const getTypeBadge = (type: string) => {
     switch (type) {
       case 'Technical':
@@ -43,16 +47,16 @@ export default function ActivityCard({ activity }: ActivityCardProps) {
             </span>
             <span
               className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getTypeBadge(
-                activity.type
+                actType
               )}`}
             >
-              {activity.type}
+              {actType}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 text-[11px] text-[#8A8592]">
             <Clock className="w-3 h-3 text-[#C89D3C]" />
-            <span>{activity.cadence}</span>
+            <span>{cadenceText}</span>
           </div>
         </div>
 
@@ -93,7 +97,7 @@ export default function ActivityCard({ activity }: ActivityCardProps) {
 
       {/* RSVP Action */}
       <div className="pt-3 border-t border-[#E8D8C3]/50 flex items-center justify-between text-xs">
-        <span className="text-[11px] text-[#8A8592]">Open to {activity.level}</span>
+        <span className="text-[11px] text-[#8A8592]">Open to {levelText}</span>
 
         <button
           onClick={() => toggleRsvpActivity(activity.id)}

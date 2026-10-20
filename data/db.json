@@ -7,40 +7,33 @@
       "name": "Awareness",
       "badge": "Human & Threat Landscape",
       "tagline": "Reading the threat landscape as it actually moves — beyond sensational headlines, into the mechanics of phishing, social engineering, malware, and emerging attack vectors.",
-      "overview": "The human element remains the primary attack surface across modern breaches. The Awareness domain equips members with critical intelligence to deconstruct spear-phishing campaigns, behavioral psychology, ransomware economics, and digital privacy.",
-      "focusAreas": [
-        "Cybersecurity intelligence & active global threat campaigns",
-        "Online scams, spear-phishing, business email compromise (BEC)",
-        "Social engineering behavioral patterns & cognitive biases",
-        "Malware families, ransomware payloads, and extortion schemes",
-        "Digital privacy, consumer data rights, and surveillance technologies",
-        "Emerging attack vectors (voice clones, deepfakes, QR code phishing)"
+      "appliedAreas": [
+        {
+          "code": "HUMAN-1",
+          "title": "Social Engineering & OSINT Defense",
+          "description": "Deconstructing phishing kits, lure templates, and OSINT footprinting."
+        },
+        {
+          "code": "HUMAN-2",
+          "title": "Operational Threat Briefings",
+          "description": "Translating daily CISA/CERT advisories into actionable student defense advisories."
+        },
+        {
+          "code": "HUMAN-3",
+          "title": "Anti-Scam & Digital Literacy",
+          "description": "Designing interactive workshops for university staff, faculty, and student bodies."
+        },
+        {
+          "code": "HUMAN-4",
+          "title": "Privacy & Data Protection",
+          "description": "Auditing personal data trails, telemetry leakage, and consumer privacy policies."
+        }
       ],
       "activities": [
         "Weekly News Briefings (Recurring intelligence roundups on zero-days and active campaigns)",
         "Awareness Campaigns (Public-facing university drives and scam prevention workshops)",
         "Discussions & Structured Debates (Member-led arguments on digital rights and policies)",
         "Content Creation & Explainers (Publishing student-friendly infographics and threat memos)"
-      ],
-      "learningPathway": [
-        {
-          "stage": "Beginner",
-          "title": "Phishing Mechanics & Personal Hygiene",
-          "description": "Inspect email headers (SPF, DKIM, DMARC), analyze deceptive URLs, and implement password manager & hardware MFA standards.",
-          "deliverable": "Author an interactive scam-detection checklist for university freshmen."
-        },
-        {
-          "stage": "Intermediate",
-          "title": "Threat Intelligence Synthesis & Campaign Dissection",
-          "description": "Track APT groups on MITRE ATT&CK, correlate malware IoCs (Indicators of Compromise), and monitor OSINT feeds.",
-          "deliverable": "Present a 15-minute weekly intelligence briefing dissecting an ongoing ransomware outbreak."
-        },
-        {
-          "stage": "Advanced",
-          "title": "Organizational Human Defense & Policy",
-          "description": "Design ethical simulated phishing programs, evaluate behavioral nudges, and analyze international cyber warfare doctrines.",
-          "deliverable": "Design and execute a campus-wide Cyber Hygiene Month campaign with measurable impact metrics."
-        }
       ]
     },
     {
@@ -457,6 +450,68 @@
         "Zero Trust Migration Case Studies",
         "Disaster Recovery Tabletop Exercises"
       ]
+    }
+  ],
+  "learningSubjects": [
+    {
+      "id": "linux",
+      "slug": "linux",
+      "number": "01",
+      "title": "Linux",
+      "subtitle": "Command Line, Scripting, Permissions & Toolchains",
+      "description": "Audited and updated description for Linux hub.",
+      "keyConcepts": [
+        "BASH command line navigation, pipes, grep, sed, and awk",
+        "POSIX user, group, and other permissions (chmod, chown, SUID/SGID)",
+        "Systemd services, journalctl logs, and background daemons",
+        "Automating recon and triage tasks using Bash & Python scripts"
+      ],
+      "handsOnLab": "Harden an Ubuntu server by locking down SSH, configuring UFW firewall rules, and auditing SUID binaries."
+    },
+    {
+      "id": "networking",
+      "slug": "networking",
+      "number": "02",
+      "title": "Networking",
+      "subtitle": "TCP/IP, Routing, DNS & Layered Traffic",
+      "description": "Network communication is the circulatory system of modern technology. Students master packet encapsulation, protocol headers, DNS resolution, and traffic inspection.",
+      "keyConcepts": [
+        "OSI 7-Layer model & TCP/IP stack mapping",
+        "Three-way handshake (SYN, SYN-ACK, ACK) and teardown",
+        "Subnetting, CIDR notation, and IP routing tables",
+        "DNS recursive resolution hierarchy and TLS handshake basics"
+      ],
+      "handsOnLab": "Capture live HTTP vs HTTPS handshakes in Wireshark and trace every protocol header byte across layers 2 through 7."
+    },
+    {
+      "id": "operating-system",
+      "slug": "operating-system",
+      "number": "03",
+      "title": "Operating System",
+      "subtitle": "Processes, Memory Models, Filesystems & Kernel Basics",
+      "description": "The operating system governs all program execution. Understanding process privilege rings, system calls, virtual memory, and kernel primitives is crucial for both attack and defense.",
+      "keyConcepts": [
+        "Ring 0 (Kernel) vs Ring 3 (User space) separation",
+        "Process trees, thread scheduling, and PID lifecycles",
+        "Virtual memory, page tables, and memory protection (DEP/NX, ASLR)",
+        "Filesystem structures: Inodes, metadata, and access permissions"
+      ],
+      "handsOnLab": "Write a small program that inspects its own memory mappings via /proc/self/maps on Linux."
+    },
+    {
+      "id": "security-fundamentals",
+      "slug": "security-fundamentals",
+      "number": "04",
+      "title": "Security Fundamentals",
+      "subtitle": "Threat Models, Defence Vocabulary, CIA Triad & Attack Surfaces",
+      "description": "The universal conceptual lens through which all security decisions are evaluated, balancing confidentiality, integrity, availability, and threat modeling.",
+      "keyConcepts": [
+        "Confidentiality, Integrity, Availability (CIA Triad)",
+        "Threat actors, vulnerability vs exploit vs risk definition",
+        "Attack surface analysis and principle of least privilege",
+        "Authentication, Authorization, and Non-repudiation (AAA)"
+      ],
+      "handsOnLab": "Perform a comprehensive attack surface audit of an open-source web application and catalog its attack vectors."
     }
   ],
   "resources": [

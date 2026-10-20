@@ -23,6 +23,9 @@ import { POST as postActivity, DELETE as deleteActivity } from '../app/api/activ
 import { POST as postAnnouncement, DELETE as deleteAnnouncement } from '../app/api/announcements/route';
 import { GET as getProjects, POST as postProject, PUT as putProject, DELETE as deleteProject } from '../app/api/projects/route';
 import { GET as getCertifications, POST as postCertification, PUT as putCertification, DELETE as deleteCertification } from '../app/api/certifications/route';
+import { GET as getLearningSubjects, PUT as putLearningSubjects } from '../app/api/learning-subjects/route';
+import { GET as getDomains, PUT as putDomains } from '../app/api/domains/route';
+import { POST as postUpload } from '../app/api/admin/upload/route';
 import { DOMAINS, LEARNING_SUBJECTS } from '../lib/data';
 import { generateStaticParams as generateSubjectParams } from '../app/learn/[subject]/page';
 
@@ -808,9 +811,186 @@ async function runTestSuite() {
       })
     })
   );
-  assert(
+    assert(
     invalidUrlRes.status === 400,
     'POST /api/resources rejects invalid/malicious URL schemes with 400 Bad Request'
+  );
+
+  // ---------------------------------------------------------------------------
+  // GROUP 9: Admin Central CMS, Content Placement, Storage & Dynamic APIs
+  // ---------------------------------------------------------------------------
+  console.log('\n--- TEST GROUP 9: Central CMS, Content Placement & Storage ---');
+
+  // 9.1 Learning Subjects API
+  const getSubjsRes = await getLearningSubjects();
+  const getSubjsData = await getSubjsRes.json();
+  assert(
+    getSubjsRes.status === 200 && getSubjsData.success && Array.isArray(getSubjsData.data) && getSubjsData.data.length === 4,
+    'GET /api/learning-subjects returns exactly four foundational learning subjects'
+  );
+
+  // 9.2 Unauthorized PUT /api/learning-subjects rejected
+  const unauthPutSubj = await putLearningSubjects(
+    new Request('http://localhost:3000/api/learning-subjects', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'linux', title: 'Hacked Title' })
+    })
+  );
+  assert(
+    unauthPutSubj.status === 401,
+    'PUT /api/learning-subjects rejected without verified admin session (401)'
+  );
+
+  // 9.3 Authorized PUT /api/learning-subjects updates subject
+  const authPutSubj = await putLearningSubjects(
+    new Request('http://localhost:3000/api/learning-subjects', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        slug: 'linux',
+        title: 'Linux',
+        subtitle: 'Command Line, Scripting, Permissions & Toolchains',
+        description: 'Audited and updated description for Linux hub.',
+        keyConcepts: [
+          'BASH command line navigation, pipes, grep, sed, and awk',
+          'POSIX user, group, and other permissions (chmod, chown, SUID/SGID)',
+          'Systemd services, journalctl logs, and background daemons',
+          'Automating recon and triage tasks using Bash & Python scripts'
+        ],
+        handsOnLab: 'Harden an Ubuntu server by locking down SSH, configuring UFW firewall rules, and auditing SUID binaries.'
+      })
+    })
+  );
+  const authPutSubjData = await authPutSubj.json();
+  assert(
+    authPutSubj.status === 200 && authPutSubjData.success,
+    'Authorized admin updates learning subject syllabus via PUT /api/learning-subjects'
+  );
+
+  // 9.4 Domains API GET returns 7 domains in order
+  const getDomsRes = await getDomains();
+  const getDomsData = await getDomsRes.json();
+  assert(
+    getDomsRes.status === 200 &&
+      getDomsData.success &&
+      getDomsData.data.length === 7 &&
+      getDomsData.data[0].slug === 'awareness' &&
+      getDomsData.data[1].slug === 'explore',
+    'GET /api/domains returns 7 domains with Awareness first (01) and Explore second (02)'
+  );
+
+  // 9.5 Unauthorized PUT /api/domains rejected
+  const unauthPutDom = await putDomains(
+    new Request('http://localhost:3000/api/domains', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: 'awareness', name: 'Hacked Name' })
+    })
+  );
+  assert(
+    unauthPutDom.status === 401,
+    'PUT /api/domains rejected without verified admin session (401)'
+  );
+
+  // 9.6 Authorized PUT /api/domains updates domain
+  const authPutDom = await putDomains(
+    new Request('http://localhost:3000/api/domains', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        slug: 'awareness',
+        name: 'Awareness',
+        badge: 'Human & Threat Landscape',
+        tagline: 'Reading the threat landscape as it actually moves — beyond sensational headlines, into the mechanics of phishing, social engineering, malware, and emerging attack vectors.'
+      })
+    })
+  );
+  const authPutDomData = await authPutDom.json();
+  assert(
+    authPutDom.status === 200 && authPutDomData.success,
+    'Authorized admin updates domain metadata via PUT /api/domains'
+  );
+
+  // 9.7 Upload API security: rejected without admin session
+  const unauthUpload = await postUpload(
+    new Request('http://localhost:3000/api/admin/upload', {
+      method: 'POST'
+    })
+  );
+  assert(
+    unauthUpload.status === 401,
+    'POST /api/admin/upload rejected without verified admin session (401)'
+  );
+
+  // 9.8 Content Placement: Resource assigned to both Domain and Subject
+  const createMultiLocRes = await postResource(
+    new Request('http://localhost:3000/api/resources', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        title: 'AUDIT-CROSS-PLACEMENT: Linux Triage Protocol',
+        description: 'Vetted resource mapped specifically to Awareness and Linux.',
+        category: 'Walkthrough',
+        difficulty: 'Beginner',
+        domainId: 'd6',
+        subjectId: 'linux',
+        url: 'https://example.com/linux-awareness-guide',
+        isPublished: true
+      })
+    })
+  );
+  const multiLocCreated = await createMultiLocRes.json();
+  const multiLocId = multiLocCreated.data.id;
+
+  // Query by domain d6
+  const queryDomD6 = await getResources(
+    new Request('http://localhost:3000/api/resources?domainId=d6')
+  );
+  const queryDomD6Data = await queryDomD6.json();
+  const foundInDomD6 = queryDomD6Data.data.some((r: any) => r.id === multiLocId);
+
+  // Query by subject linux
+  const querySubjLinux = await getResources(
+    new Request('http://localhost:3000/api/resources?subjectId=linux')
+  );
+  const querySubjLinuxData = await querySubjLinux.json();
+  const foundInSubjLinux = querySubjLinuxData.data.some((r: any) => r.id === multiLocId);
+
+  // Query by unrelated domain d1 (Red & Blue Team)
+  const queryDomD1 = await getResources(
+    new Request('http://localhost:3000/api/resources?domainId=d1')
+  );
+  const queryDomD1Data = await queryDomD1.json();
+  const foundInDomD1 = queryDomD1Data.data.some((r: any) => r.id === multiLocId);
+
+  // Query by unrelated subject networking
+  const querySubjNet = await getResources(
+    new Request('http://localhost:3000/api/resources?subjectId=networking')
+  );
+  const querySubjNetData = await querySubjNet.json();
+  const foundInSubjNet = querySubjNetData.data.some((r: any) => r.id === multiLocId);
+
+  assert(
+    foundInDomD6 && foundInSubjLinux && !foundInDomD1 && !foundInSubjNet,
+    'Resource is accurately placed in assigned domain and subject without cross-contamination into unrelated sections'
+  );
+
+  // Delete test resource
+  await deleteResource(
+    new Request(`http://localhost:3000/api/resources?id=${multiLocId}`, {
+      method: 'DELETE',
+      headers: { cookie: adminCookie }
+    })
   );
 
   // Clean up any test records created during test run to maintain a pristine database

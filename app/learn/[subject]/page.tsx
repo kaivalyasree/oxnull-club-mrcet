@@ -29,7 +29,7 @@ export async function generateMetadata({
   params: Promise<{ subject: string }>;
 }) {
   const { subject: slug } = await params;
-  const subject = LEARNING_SUBJECTS.find((s) => s.slug === slug || s.id === slug);
+  const subject = db.getLearningSubjectBySlug(slug) || LEARNING_SUBJECTS.find((s) => s.slug === slug || s.id === slug);
   if (!subject) {
     return { title: 'Subject Not Found | 0XNULL' };
   }
@@ -61,7 +61,7 @@ export default async function SubjectLearningPage({
   params: Promise<{ subject: string }>;
 }) {
   const { subject: slug } = await params;
-  const subject = LEARNING_SUBJECTS.find((s) => s.slug === slug || s.id === slug);
+  const subject = db.getLearningSubjectBySlug(slug) || LEARNING_SUBJECTS.find((s) => s.slug === slug || s.id === slug);
 
   if (!subject) {
     notFound();

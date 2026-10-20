@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { DOMAINS } from '@/lib/data';
+import { db } from '@/lib/store';
 import { ArrowRight, Compass, Shield, ChevronRight } from 'lucide-react';
 
 export const metadata = {
@@ -9,6 +9,8 @@ export const metadata = {
 };
 
 export default function DomainsIndexPage() {
+  const domains = db.getDomains();
+
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -26,7 +28,7 @@ export default function DomainsIndexPage() {
 
       {/* Grid of all 7 Domains */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {DOMAINS.map((domain) => (
+        {domains.map((domain) => (
           <Link
             key={domain.slug}
             href={`/domains/${domain.slug}`}

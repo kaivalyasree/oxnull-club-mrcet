@@ -113,11 +113,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     (a) =>
       a.title.toLowerCase().includes(q) ||
       a.summary.toLowerCase().includes(q) ||
-      a.type.toLowerCase().includes(q)
+      (a.type || a.format || '').toLowerCase().includes(q)
   ).map((a) => ({
     id: a.id,
     title: `${a.number} — ${a.title}`,
-    subtitle: `${a.type} • ${a.cadence} • ${a.summary}`,
+    subtitle: `${a.type || a.format || 'Technical'} • ${a.cadence || a.frequency || 'Weekly'} • ${a.summary}`,
     badge: 'Activity',
     href: `/activities`,
     icon: Sparkles,

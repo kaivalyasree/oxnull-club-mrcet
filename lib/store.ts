@@ -2,7 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import {
   DOMAINS,
+  LEARNING_SUBJECTS,
   Domain,
+  LearningSubject,
   Resource,
   Certification,
   Project,
@@ -38,6 +40,7 @@ export interface ClubApplication {
 
 export interface StoreSchema {
   domains: Domain[];
+  learningSubjects: LearningSubject[];
   resources: Resource[];
   certifications: Certification[];
   projects: Project[];
@@ -58,6 +61,7 @@ function ensureDataFile(): StoreSchema {
   if (!fs.existsSync(DB_FILE)) {
     const initialData: StoreSchema = {
       domains: DOMAINS,
+      learningSubjects: LEARNING_SUBJECTS,
       resources: [],
       certifications: [],
       projects: [],
@@ -75,6 +79,7 @@ function ensureDataFile(): StoreSchema {
     const parsed = JSON.parse(fileContent) as StoreSchema;
     if (!parsed.applications) parsed.applications = [];
     if (!parsed.domains || parsed.domains.length === 0) parsed.domains = DOMAINS;
+    if (!parsed.learningSubjects || parsed.learningSubjects.length === 0) parsed.learningSubjects = LEARNING_SUBJECTS;
     if (!parsed.resources) parsed.resources = [];
     if (!parsed.certifications) parsed.certifications = [];
     if (!parsed.projects) parsed.projects = [];
@@ -86,6 +91,7 @@ function ensureDataFile(): StoreSchema {
     console.error('Error reading db.json, returning empty defaults', error);
     return {
       domains: DOMAINS,
+      learningSubjects: LEARNING_SUBJECTS,
       resources: [],
       certifications: [],
       projects: [],
@@ -115,18 +121,47 @@ export const db = {
 
   // Domains (Required structural foundational configuration)
   getDomains(): Domain[] {
-    return ensureDataFile().domains;
+    const store = ensureDataFile();
+    return store.domains && store.domains.length > 0 ? store.domains : DOMAINS;
   },
   getDomainBySlug(slug: string): Domain | undefined {
-    return ensureDataFile().domains.find((d) => d.slug === slug);
+    const store = ensureDataFile();
+    const list = store.domains && store.domains.length > 0 ? store.domains : DOMAINS;
+    const found = list.find((d) => d.slug === slug || d.id === slug);
+    if (!found) return undefined;
+    const base = DOMAINS.find((d) => d.slug === slug || d.id === slug);
+    return base ? { ...base, ...found } : found;
   },
   updateDomain(slug: string, updated: Partial<Domain>): Domain | null {
     const store = ensureDataFile();
-    const index = store.domains.findIndex((d) => d.slug === slug);
+    const index = store.domains.findIndex((d) => d.slug === slug || d.id === slug);
     if (index === -1) return null;
     store.domains[index] = { ...store.domains[index], ...updated };
     writeDataFile(store);
     return store.domains[index];
+  },
+
+  // Learning Subjects
+  getLearningSubjects(): LearningSubject[] {
+    const store = ensureDataFile();
+    return store.learningSubjects && store.learningSubjects.length > 0
+      ? store.learningSubjects
+      : LEARNING_SUBJECTS;
+  },
+  getLearningSubjectBySlug(slug: string): LearningSubject | undefined {
+    const store = ensureDataFile();
+    const list = store.learningSubjects && store.learningSubjects.length > 0
+      ? store.learningSubjects
+      : LEARNING_SUBJECTS;
+    return list.find((s) => s.slug === slug || s.id === slug);
+  },
+  updateLearningSubject(slug: string, updated: Partial<LearningSubject>): LearningSubject | null {
+    const store = ensureDataFile();
+    const index = store.learningSubjects.findIndex((s) => s.slug === slug || s.id === slug);
+    if (index === -1) return null;
+    store.learningSubjects[index] = { ...store.learningSubjects[index], ...updated };
+    writeDataFile(store);
+    return store.learningSubjects[index];
   },
 
   // Resources

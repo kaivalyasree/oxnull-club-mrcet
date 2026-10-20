@@ -109,12 +109,18 @@ export interface Activity {
   id: string;
   number: string;
   title: string;
-  type: 'Technical' | 'Non-Technical' | 'Community' | 'Career';
-  level: 'All Levels' | 'Beginner' | 'Intermediate' | 'Advanced';
-  cadence: 'Weekly' | 'Bi-Weekly' | 'Monthly' | 'Term-Long' | 'Recurring';
+  subtitle?: string;
+  type?: 'Technical' | 'Non-Technical' | 'Community' | 'Career' | string;
+  format?: string;
+  level?: 'All Levels' | 'Beginner' | 'Intermediate' | 'Advanced' | string;
+  cadence?: 'Weekly' | 'Bi-Weekly' | 'Monthly' | 'Term-Long' | 'Recurring' | string;
+  frequency?: string;
   summary: string;
   description: string;
-  outcomes: string[];
+  participants?: string;
+  domainId?: string;
+  domainName?: string;
+  outcomes?: string[];
 }
 
 export interface FoundationTopic {
