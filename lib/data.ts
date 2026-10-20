@@ -30,44 +30,79 @@ export interface Domain {
   activities: string[];
 }
 
+export interface LearningSubject {
+  id: string;
+  slug: string;
+  number: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  keyConcepts: string[];
+  handsOnLab: string;
+}
+
 export interface Resource {
   id: string;
   title: string;
-  domainId: string;
-  domainName: string;
-  category: 'Walkthrough' | 'Tool' | 'Cheat Sheet' | 'Documentation' | 'Research Paper' | 'Lab Environment';
+  domainId?: string;
+  domainName?: string;
+  subjectId?: string;
+  subjectName?: string;
+  category: 'Walkthrough' | 'Tool' | 'Cheat Sheet' | 'Documentation' | 'Research Paper' | 'Lab Environment' | 'Article' | 'Video' | 'Website' | 'Downloadable File';
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
   url: string;
-  estimatedHours: number;
+  estimatedHours?: number;
+  isExternal?: boolean;
+  author?: string;
+  isPublished?: boolean;
+  tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Certification {
   id: string;
   name: string;
-  code: string;
+  code?: string;
   provider: string;
-  domainId: string;
-  domainName: string;
+  domainId?: string;
+  domainName?: string;
+  subjectId?: string;
+  subjectName?: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
   url: string;
-  prerequisites: string;
-  careerRoles: string[];
+  cost?: string;
+  tags?: string[];
+  prerequisites?: string;
+  careerRoles?: string[];
+  isPublished?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Project {
   id: string;
   title: string;
-  domainId: string;
-  domainName: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  domainId?: string;
+  domainName?: string;
+  subjectId?: string;
+  subjectName?: string;
+  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
   description: string;
-  techStack: string[];
-  status: 'Active' | 'Recruiting' | 'Completed' | 'Research';
+  techStack?: string[];
+  tags?: string[];
+  stars?: number;
+  status: 'Active' | 'Recruiting' | 'Completed' | 'Research' | 'Active Lab' | 'In Research' | 'Production Ready' | 'Incubating';
   githubUrl?: string;
   demoUrl?: string;
+  imageUrl?: string;
+  thumbnail?: string;
   leadMember?: string;
+  isPublished?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Activity {
@@ -109,12 +144,103 @@ export interface Announcement {
   author: string;
 }
 
-// 7 Domains from the official 0XNULL Proposal PDF
+// 7 Domains from the official 0XNULL Proposal PDF (Awareness #1, Explore #2)
 export const DOMAINS: Domain[] = [
+  {
+    id: 'd6',
+    slug: 'awareness',
+    number: '01',
+    name: 'Awareness',
+    badge: 'Human & Threat Landscape',
+    tagline: 'Reading the threat landscape as it actually moves — beyond sensational headlines, into the mechanics of phishing, social engineering, malware, and emerging attack vectors.',
+    overview: 'The human element remains the primary attack surface across modern breaches. The Awareness domain equips members with critical intelligence to deconstruct spear-phishing campaigns, behavioral psychology, ransomware economics, and digital privacy.',
+    focusAreas: [
+      'Cybersecurity intelligence & active global threat campaigns',
+      'Online scams, spear-phishing, business email compromise (BEC)',
+      'Social engineering behavioral patterns & cognitive biases',
+      'Malware families, ransomware payloads, and extortion schemes',
+      'Digital privacy, consumer data rights, and surveillance technologies',
+      'Emerging attack vectors (voice clones, deepfakes, QR code phishing)'
+    ],
+    activities: [
+      'Weekly News Briefings (Recurring intelligence roundups on zero-days and active campaigns)',
+      'Awareness Campaigns (Public-facing university drives and scam prevention workshops)',
+      'Discussions & Structured Debates (Member-led arguments on digital rights and policies)',
+      'Content Creation & Explainers (Publishing student-friendly infographics and threat memos)'
+    ],
+    learningPathway: [
+      {
+        stage: 'Beginner',
+        title: 'Phishing Mechanics & Personal Hygiene',
+        description: 'Inspect email headers (SPF, DKIM, DMARC), analyze deceptive URLs, and implement password manager & hardware MFA standards.',
+        deliverable: 'Author an interactive scam-detection checklist for university freshmen.'
+      },
+      {
+        stage: 'Intermediate',
+        title: 'Threat Intelligence Synthesis & Campaign Dissection',
+        description: 'Track APT groups on MITRE ATT&CK, correlate malware IoCs (Indicators of Compromise), and monitor OSINT feeds.',
+        deliverable: 'Present a 15-minute weekly intelligence briefing dissecting an ongoing ransomware outbreak.'
+      },
+      {
+        stage: 'Advanced',
+        title: 'Organizational Human Defense & Policy',
+        description: 'Design ethical simulated phishing programs, evaluate behavioral nudges, and analyze international cyber warfare doctrines.',
+        deliverable: 'Design and execute a campus-wide Cyber Hygiene Month campaign with measurable impact metrics.'
+      }
+    ]
+  },
+  {
+    id: 'd7',
+    slug: 'explore',
+    number: '02',
+    name: 'Explore',
+    badge: 'Discovery & Leadership',
+    tagline: 'A platform where students try different non-technical domains, discover their interests and potential, and choose skills they want to develop further.',
+    overview: 'Not all cybersecurity excellence is code. The Explore domain is 0XNULL\'s incubator for discovery, communication, and executive leadership. Students discover where their natural talents lie — bridging technical engineering with human leadership, public speaking, event production, and community partnerships.',
+    focusAreas: [
+      'Discover personal interests beyond conventional technical tracks',
+      'Real-world creative, design, & communication projects',
+      'Leadership, teamwork, & large-scale event operations',
+      'Public relations, community networking, & industry outreach',
+      'Interdisciplinary collaboration between technical and non-technical students'
+    ],
+    appliedAreas: [
+      { code: 'SKILL-1', title: 'Communication & Storytelling', description: 'Translating complex CVEs and binary exploits into clear executive narratives.' },
+      { code: 'SKILL-2', title: 'Public Speaking & Presentations', description: 'Delivering keynote conference talks and technical demonstrations with confidence.' },
+      { code: 'SKILL-3', title: 'Teamwork & Event Management', description: 'Orchestrating hackathons, CTFs, guest seminars, and multi-track workshops.' },
+      { code: 'SKILL-4', title: 'PR & Industry Outreach', description: 'Partnering with security firms, alumni practitioners, and national cybersecurity organizations.' }
+    ],
+    learningPathway: [
+      {
+        stage: 'Beginner',
+        title: 'Community Contribution & Peer Collaboration',
+        description: 'Join event coordination teams, co-author meeting minutes, and facilitate breakout rooms during workshops.',
+        deliverable: 'Organize and host a 0XNULL peer study circle with at least 15 attendees.'
+      },
+      {
+        stage: 'Intermediate',
+        title: 'Public Presentation & Workshop Facilitation',
+        description: 'Develop technical presentation decks, master stage presence, and coordinate speaker logistics for guest lecturers.',
+        deliverable: 'Deliver a solo 20-minute lightning talk on a technology topic at a club general meeting.'
+      },
+      {
+        stage: 'Advanced',
+        title: 'Executive Leadership & Partnership Building',
+        description: 'Lead club operational domains, manage mentorship programs, spearhead industry sponsorships, and guide junior cohorts.',
+        deliverable: 'Direct the planning and execution of 0XNULL\'s flagship annual cybersecurity conference.'
+      }
+    ],
+    activities: [
+      'Public Speaking Bootcamps',
+      'Hackathon Organization Sprints',
+      'Industry Networking Mixers',
+      'Cross-Domain Innovation Challenges'
+    ]
+  },
   {
     id: 'd1',
     slug: 'red-blue-team',
-    number: '01',
+    number: '03',
     name: 'Red & Blue Team',
     badge: 'Offence & Defence',
     tagline: 'Two perspectives, one discipline — attack to understand, defend to protect. Every exercise is conducted in controlled labs with documented ethical boundaries.',
@@ -187,7 +313,7 @@ export const DOMAINS: Domain[] = [
   {
     id: 'd2',
     slug: 'digital-forensics',
-    number: '02',
+    number: '04',
     name: 'Digital Forensics',
     badge: 'Investigation & Artefacts',
     tagline: 'Reconstructing events from artefacts — disk, memory and network traces. The discipline of answering "what happened" with evidence, not assumption.',
@@ -245,7 +371,7 @@ export const DOMAINS: Domain[] = [
   {
     id: 'd3',
     slug: 'cryptography',
-    number: '03',
+    number: '05',
     name: 'Cryptography',
     badge: 'Mathematical Trust',
     tagline: 'The mathematics that allows two parties to establish trust across an untrusted wire — turning plaintext into ciphertext impenetrable to adversaries.',
@@ -311,7 +437,7 @@ export const DOMAINS: Domain[] = [
   {
     id: 'd4',
     slug: 'cloud-security',
-    number: '04',
+    number: '06',
     name: 'Cloud Security',
     badge: 'Infrastructure & Posture',
     tagline: 'Most modern systems live in cloud infrastructure. Members learn the shared responsibility model, identity perimeters, and common misconfigurations.',
@@ -366,7 +492,7 @@ export const DOMAINS: Domain[] = [
   {
     id: 'd5',
     slug: 'security-architecture',
-    number: '05',
+    number: '07',
     name: 'Security Architecture',
     badge: 'Structural Defense',
     tagline: 'Designing systems where security is structural, not bolted-on — threat-modelled, layered, and resilient against evolving threats.',
@@ -412,97 +538,6 @@ export const DOMAINS: Domain[] = [
       'Architecture Redline & Review Panels',
       'Zero Trust Migration Case Studies',
       'Disaster Recovery Tabletop Exercises'
-    ]
-  },
-  {
-    id: 'd6',
-    slug: 'awareness',
-    number: '06',
-    name: 'Awareness',
-    badge: 'Human & Threat Landscape',
-    tagline: 'Reading the threat landscape as it actually moves — beyond sensational headlines, into the mechanics of phishing, social engineering, malware, and emerging attack vectors.',
-    overview: 'The human element remains the primary attack surface across modern breaches. The Awareness domain equips members with critical intelligence to deconstruct spear-phishing campaigns, behavioral psychology, ransomware economics, and digital privacy.',
-    focusAreas: [
-      'Cybersecurity intelligence & active global threat campaigns',
-      'Online scams, spear-phishing, business email compromise (BEC)',
-      'Social engineering behavioral patterns & cognitive biases',
-      'Malware families, ransomware payloads, and extortion schemes',
-      'Digital privacy, consumer data rights, and surveillance technologies',
-      'Emerging attack vectors (AI voice clones, deepfakes, QR code phishing)'
-    ],
-    activities: [
-      'Weekly News Briefings (Recurring intelligence roundups on zero-days and active campaigns)',
-      'Awareness Campaigns (Public-facing university drives and scam prevention workshops)',
-      'Discussions & Structured Debates (Member-led arguments on digital rights, AI, and policies)',
-      'Content Creation & Explainers (Publishing student-friendly infographics and threat memos)'
-    ],
-    learningPathway: [
-      {
-        stage: 'Beginner',
-        title: 'Phishing Mechanics & Personal Hygiene',
-        description: 'Inspect email headers (SPF, DKIM, DMARC), analyze deceptive URLs, and implement password manager & hardware MFA standards.',
-        deliverable: 'Author an interactive scam-detection checklist for university freshmen.'
-      },
-      {
-        stage: 'Intermediate',
-        title: 'Threat Intelligence Synthesis & Campaign Dissection',
-        description: 'Track APT groups on MITRE ATT&CK, correlate malware IoCs (Indicators of Compromise), and monitor OSINT feeds.',
-        deliverable: 'Present a 15-minute weekly intelligence briefing dissecting an ongoing ransomware outbreak.'
-      },
-      {
-        stage: 'Advanced',
-        title: 'Organizational Human Defense & Policy',
-        description: 'Design ethical simulated phishing programs, evaluate behavioral nudges, and analyze international cyber warfare doctrines.',
-        deliverable: 'Design and execute a campus-wide Cyber Hygiene Month campaign with measurable impact metrics.'
-      }
-    ]
-  },
-  {
-    id: 'd7',
-    slug: 'explore',
-    number: '07',
-    name: 'Explore',
-    badge: 'Discovery & Leadership',
-    tagline: 'A platform where students try different non-technical domains, discover their interests and potential, and choose skills they want to develop further.',
-    overview: 'Not all cybersecurity excellence is code. The Explore domain is 0XNULL\'s incubator for discovery, communication, and executive leadership. Students discover where their natural talents lie — bridging technical engineering with human leadership, public speaking, event production, and community partnerships.',
-    focusAreas: [
-      'Discover personal interests beyond conventional technical tracks',
-      'Real-world creative, design, & communication projects',
-      'Leadership, teamwork, & large-scale event operations',
-      'Public relations, community networking, & industry outreach',
-      'Interdisciplinary collaboration between technical and non-technical students'
-    ],
-    appliedAreas: [
-      { code: 'SKILL-1', title: 'Communication & Storytelling', description: 'Translating complex CVEs and binary exploits into clear executive narratives.' },
-      { code: 'SKILL-2', title: 'Public Speaking & Presentations', description: 'Delivering keynote conference talks and technical demonstrations with confidence.' },
-      { code: 'SKILL-3', title: 'Teamwork & Event Management', description: 'Orchestrating hackathons, CTFs, guest seminars, and multi-track workshops.' },
-      { code: 'SKILL-4', title: 'PR & Industry Outreach', description: 'Partnering with security firms, alumni practitioners, and national cybersecurity organizations.' }
-    ],
-    learningPathway: [
-      {
-        stage: 'Beginner',
-        title: 'Community Contribution & Peer Collaboration',
-        description: 'Join event coordination teams, co-author meeting minutes, and facilitate breakout rooms during workshops.',
-        deliverable: 'Organize and host a 0XNULL peer study circle with at least 15 attendees.'
-      },
-      {
-        stage: 'Intermediate',
-        title: 'Public Presentation & Workshop Facilitation',
-        description: 'Develop technical presentation decks, master stage presence, and coordinate speaker logistics for guest lecturers.',
-        deliverable: 'Deliver a solo 20-minute lightning talk on a technology topic at a club general meeting.'
-      },
-      {
-        stage: 'Advanced',
-        title: 'Executive Leadership & Partnership Building',
-        description: 'Lead club operational domains, manage mentorship programs, spearhead industry sponsorships, and guide junior cohorts.',
-        deliverable: 'Direct the planning and execution of 0XNULL\'s flagship annual cybersecurity conference.'
-      }
-    ],
-    activities: [
-      'Public Speaking Bootcamps',
-      'Hackathon Organization Sprints',
-      'Industry Networking Mixers',
-      'Cross-Domain Innovation Challenges'
     ]
   }
 ];
@@ -574,6 +609,70 @@ export const FOUNDATION_TOPICS: FoundationTopic[] = [
     title: 'Security Fundamentals',
     subtitle: 'Threat Models, Defence Vocabulary, CIA Triad & Attack Surfaces',
     description: 'The universal conceptual lens through which all security decisions are evaluated, balancing confidentiality, integrity, and availability.',
+    keyConcepts: [
+      'Confidentiality, Integrity, Availability (CIA Triad)',
+      'Threat actors, vulnerability vs exploit vs risk definition',
+      'Attack surface analysis and principle of least privilege',
+      'Authentication, Authorization, and Non-repudiation (AAA)'
+    ],
+    handsOnLab: 'Perform a comprehensive attack surface audit of an open-source web application and catalog its attack vectors.'
+  }
+];
+
+// 4 Dedicated Learning Subjects (Linux, Networking, Operating System, Security Fundamentals)
+export const LEARNING_SUBJECTS: LearningSubject[] = [
+  {
+    id: 'linux',
+    slug: 'linux',
+    number: '01',
+    title: 'Linux',
+    subtitle: 'Command Line, Scripting, Permissions & Toolchains',
+    description: 'Linux is the de facto operating system of cloud infrastructure, security tools, and forensic environments. Command line fluency and shell automation are essential skills for every cybersecurity practitioner.',
+    keyConcepts: [
+      'BASH command line navigation, pipes, grep, sed, and awk',
+      'POSIX user, group, and other permissions (chmod, chown, SUID/SGID)',
+      'Systemd services, journalctl logs, and background daemons',
+      'Automating recon and triage tasks using Bash & Python scripts'
+    ],
+    handsOnLab: 'Harden an Ubuntu server by locking down SSH, configuring UFW firewall rules, and auditing SUID binaries.'
+  },
+  {
+    id: 'networking',
+    slug: 'networking',
+    number: '02',
+    title: 'Networking',
+    subtitle: 'TCP/IP, Routing, DNS & Layered Traffic',
+    description: 'Network communication is the circulatory system of modern technology. Students master packet encapsulation, protocol headers, DNS resolution, and traffic inspection.',
+    keyConcepts: [
+      'OSI 7-Layer model & TCP/IP stack mapping',
+      'Three-way handshake (SYN, SYN-ACK, ACK) and teardown',
+      'Subnetting, CIDR notation, and IP routing tables',
+      'DNS recursive resolution hierarchy and TLS handshake basics'
+    ],
+    handsOnLab: 'Capture live HTTP vs HTTPS handshakes in Wireshark and trace every protocol header byte across layers 2 through 7.'
+  },
+  {
+    id: 'operating-system',
+    slug: 'operating-system',
+    number: '03',
+    title: 'Operating System',
+    subtitle: 'Processes, Memory Models, Filesystems & Kernel Basics',
+    description: 'The operating system governs all program execution. Understanding process privilege rings, system calls, virtual memory, and kernel primitives is crucial for both attack and defense.',
+    keyConcepts: [
+      'Ring 0 (Kernel) vs Ring 3 (User space) separation',
+      'Process trees, thread scheduling, and PID lifecycles',
+      'Virtual memory, page tables, and memory protection (DEP/NX, ASLR)',
+      'Filesystem structures: Inodes, metadata, and access permissions'
+    ],
+    handsOnLab: 'Write a small program that inspects its own memory mappings via /proc/self/maps on Linux.'
+  },
+  {
+    id: 'security-fundamentals',
+    slug: 'security-fundamentals',
+    number: '04',
+    title: 'Security Fundamentals',
+    subtitle: 'Threat Models, Defence Vocabulary, CIA Triad & Attack Surfaces',
+    description: 'The universal conceptual lens through which all security decisions are evaluated, balancing confidentiality, integrity, availability, and threat modeling.',
     keyConcepts: [
       'Confidentiality, Integrity, Availability (CIA Triad)',
       'Threat actors, vulnerability vs exploit vs risk definition',

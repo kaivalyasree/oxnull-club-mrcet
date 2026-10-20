@@ -5,7 +5,7 @@ import { ArrowRight, Compass, Shield, ChevronRight } from 'lucide-react';
 
 export const metadata = {
   title: 'Seven Cybersecurity Domains | 0XNULL',
-  description: 'Explore the seven specialized cybersecurity domains at 0XNULL: Red & Blue Team, Digital Forensics, Cryptography, Cloud Security, Security Architecture, Awareness, and Explore.'
+  description: 'Explore the seven specialized cybersecurity domains at 0XNULL: Awareness, Explore, Red & Blue Team, Digital Forensics, Cryptography, Cloud Security, and Security Architecture.'
 };
 
 export default function DomainsIndexPage() {

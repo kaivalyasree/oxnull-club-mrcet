@@ -123,7 +123,7 @@ export default function AboutPage() {
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-base font-bold tracking-wider text-[#151417] max-w-2xl mx-auto">
           <span>M. MANI VARDHAN REDDY</span>
           <span className="text-[#D4AF37]/50">•</span>
-          <span>S. KAIVALYA</span>
+          <span>S. KAIVALYA SRI</span>
           <span className="text-[#D4AF37]/50">•</span>
           <span>D. ARAVIND KOUSHIK</span>
         </div>

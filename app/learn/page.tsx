@@ -2,19 +2,19 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FOUNDATION_TOPICS } from '@/lib/data';
+import { LEARNING_SUBJECTS } from '@/lib/data';
 import { useAuth } from '@/lib/auth-context';
 import {
   CheckCircle,
   Circle,
-  Cpu,
   Layers,
   Terminal,
   Network,
   ShieldAlert,
   ArrowRight,
+  BookOpen,
   Sparkles,
-  BookOpen
+  ExternalLink
 } from 'lucide-react';
 
 export default function LearnPage() {
@@ -22,7 +22,7 @@ export default function LearnPage() {
 
   const workflowSteps = [
     { step: '01', title: 'START HERE', subtitle: 'Join 0XNULL cohort and assess systems baseline' },
-    { step: '02', title: 'BUILD FUNDAMENTALS', subtitle: 'Complete all 5 foundational modules below' },
+    { step: '02', title: 'BUILD FUNDAMENTALS', subtitle: 'Complete all 4 foundational subjects below' },
     { step: '03', title: 'CHOOSE DOMAIN', subtitle: 'Select 1 or 2 focus tracks across the 7 domains' },
     { step: '04', title: 'LEARN', subtitle: 'Study curated whitepapers and vendor blueprints' },
     { step: '05', title: 'PRACTICE', subtitle: 'Conduct hands-on virtualized labs & CTF puzzles' },
@@ -31,25 +31,25 @@ export default function LearnPage() {
     { step: '08', title: 'CONTRIBUTE', subtitle: 'Lead peer workshops, mentor juniors & publish' }
   ];
 
-  const getTopicIcon = (num: string) => {
-    switch (num) {
-      case '01':
-        return Cpu;
-      case '02':
-        return Network;
-      case '03':
-        return Layers;
-      case '04':
+  const getSubjectIcon = (slug: string) => {
+    switch (slug) {
+      case 'linux':
         return Terminal;
-      case '05':
+      case 'networking':
+        return Network;
+      case 'operating-system':
+        return Layers;
+      case 'security-fundamentals':
         return ShieldAlert;
       default:
         return BookOpen;
     }
   };
 
-  const completedCount = progress.completedFoundationIds.length;
-  const progressPercent = Math.round((completedCount / FOUNDATION_TOPICS.length) * 100);
+  const completedCount = progress.completedFoundationIds.filter((id) =>
+    LEARNING_SUBJECTS.some((s) => s.id === id || s.slug === id)
+  ).length;
+  const progressPercent = Math.round((completedCount / LEARNING_SUBJECTS.length) * 100);
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 max-w-7xl mx-auto space-y-16">
@@ -70,7 +70,7 @@ export default function LearnPage() {
           <div className="flex items-center justify-between text-xs font-semibold mb-2">
             <span className="text-[#151417]">Your Foundation Mastery</span>
             <span className="text-[#967223]">
-              {completedCount} of {FOUNDATION_TOPICS.length} Complete ({progressPercent}%)
+              {completedCount} of {LEARNING_SUBJECTS.length} Complete ({progressPercent}%)
             </span>
           </div>
           <div className="w-full h-2.5 rounded-full bg-[#E8D8C3]/50 overflow-hidden">
@@ -120,26 +120,28 @@ export default function LearnPage() {
         </div>
       </section>
 
-      {/* The 5 Foundation Modules (PDF Page 3) */}
+      {/* The 4 Core Learning Subjects */}
       <section className="space-y-6">
         <div>
           <span className="text-xs uppercase font-bold tracking-widest text-[#967223]">
-            Five Pillars
+            Four Foundational Pillars
           </span>
-          <h2 className="text-3xl font-black text-[#151417]">The Five Foundational Modules</h2>
+          <h2 className="text-3xl font-black text-[#151417]">Core Learning Subjects</h2>
           <p className="text-xs sm:text-sm text-[#645E6D] mt-1">
-            Click &ldquo;Mark as Complete&rdquo; as you master each module to track your foundation progress.
+            Select a subject to enter its dedicated hub, study resources, and complete hands-on labs.
           </p>
         </div>
 
         <div className="space-y-6">
-          {FOUNDATION_TOPICS.map((topic) => {
-            const Icon = getTopicIcon(topic.number);
-            const isCompleted = progress.completedFoundationIds.includes(topic.id);
+          {LEARNING_SUBJECTS.map((subject) => {
+            const Icon = getSubjectIcon(subject.slug);
+            const isCompleted =
+              progress.completedFoundationIds.includes(subject.id) ||
+              progress.completedFoundationIds.includes(subject.slug);
 
             return (
               <div
-                key={topic.id}
+                key={subject.id}
                 className={`glass-card rounded-3xl p-6 sm:p-8 transition-all duration-300 border ${
                   isCompleted
                     ? 'border-emerald-300 bg-emerald-50/15'
@@ -156,7 +158,7 @@ export default function LearnPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs font-bold text-[#8C6B1B]">
-                            MODULE {topic.number}
+                            SUBJECT {subject.number}
                           </span>
                           {isCompleted && (
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
@@ -165,16 +167,21 @@ export default function LearnPage() {
                           )}
                         </div>
                         <h3 className="text-xl sm:text-2xl font-black text-[#151417]">
-                          {topic.title}
+                          <Link
+                            href={`/learn/${subject.slug}`}
+                            className="hover:text-[#967223] transition-colors"
+                          >
+                            {subject.title}
+                          </Link>
                         </h3>
                         <p className="text-xs font-semibold text-[#8C6B1B]">
-                          {topic.subtitle}
+                          {subject.subtitle}
                         </p>
                       </div>
                     </div>
 
                     <p className="text-xs sm:text-sm text-[#55505C] leading-relaxed">
-                      {topic.description}
+                      {subject.description}
                     </p>
 
                     <div>
@@ -182,7 +189,7 @@ export default function LearnPage() {
                         Key Concepts Covered
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {topic.keyConcepts.map((concept, i) => (
+                        {subject.keyConcepts.map((concept, i) => (
                           <div
                             key={i}
                             className="p-2.5 rounded-xl bg-white border border-[#E8D8C3] text-xs font-medium text-[#151417] flex items-center gap-2"
@@ -198,14 +205,14 @@ export default function LearnPage() {
                       <span className="font-bold text-[#967223] block mb-0.5">
                         Hands-On Verification Lab:
                       </span>
-                      <span className="text-[#55505C]">{topic.handsOnLab}</span>
+                      <span className="text-[#55505C]">{subject.handsOnLab}</span>
                     </div>
                   </div>
 
-                  {/* Right: Check action */}
-                  <div className="shrink-0 flex flex-col items-end justify-between">
+                  {/* Right: Actions */}
+                  <div className="shrink-0 flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-3">
                     <button
-                      onClick={() => toggleCompleteFoundation(topic.id)}
+                      onClick={() => toggleCompleteFoundation(subject.id)}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                         isCompleted
                           ? 'bg-emerald-600 text-white shadow-xs'
@@ -215,7 +222,7 @@ export default function LearnPage() {
                       {isCompleted ? (
                         <>
                           <CheckCircle className="w-4 h-4" />
-                          <span>Module Completed</span>
+                          <span>Subject Completed</span>
                         </>
                       ) : (
                         <>
@@ -224,6 +231,14 @@ export default function LearnPage() {
                         </>
                       )}
                     </button>
+
+                    <Link
+                      href={`/learn/${subject.slug}`}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors flex items-center gap-2 shadow-xs group"
+                    >
+                      <span>Open {subject.title} Hub</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[#E5C378] group-hover:translate-x-1 transition-transform" />
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -238,7 +253,7 @@ export default function LearnPage() {
           Ready to Choose Your Specialized Domain?
         </h3>
         <p className="text-xs sm:text-sm text-[#55505C] max-w-lg mx-auto mb-6">
-          Once your fundamentals are locked, explore our seven specialized domains from Red/Blue Team to Cloud Security and Cryptography.
+          Once your fundamentals are locked, explore our seven specialized domains from Awareness to Red/Blue Team and Cryptography.
         </p>
         <Link
           href="/domains"

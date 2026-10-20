@@ -2,14 +2,34 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/store';
 import { verifyAdminSession } from '@/lib/admin-auth';
 
+function isValidUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  const trimmed = urlStr.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return true;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const domainId = searchParams.get('domainId');
-    let projects = db.getProjects();
-    if (domainId) {
-      projects = projects.filter((p) => p.domainId === domainId);
-    }
+    const all = searchParams.get('all') === 'true';
+
+    const auth = await verifyAdminSession(request);
+    const isAdmin = auth.authorized;
+
+    const publishedOnly = !isAdmin || !all;
+
+    const projects = db.getProjects({
+      publishedOnly,
+      domainId: domainId || undefined
+    });
+
     return NextResponse.json({ success: true, data: projects });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to fetch projects' }, { status: 500 });
@@ -27,10 +47,41 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    if (!body.title || !body.domainId) {
-      return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
+    if (!body.title?.trim() || !body.domainId) {
+      return NextResponse.json(
+        { success: false, error: 'Project title and domain are required' },
+        { status: 400 }
+      );
     }
-    const created = db.addProject(body);
+
+    if (body.githubUrl && !isValidUrl(body.githubUrl)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid GitHub URL. Must be a valid HTTP/HTTPS link.' },
+        { status: 400 }
+      );
+    }
+
+    if (body.demoUrl && !isValidUrl(body.demoUrl)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid Demo URL. Must be a valid HTTP/HTTPS link.' },
+        { status: 400 }
+      );
+    }
+
+    const created = db.addProject({
+      title: body.title.trim(),
+      description: body.description?.trim() || '',
+      domainId: body.domainId,
+      domainName: body.domainName || 'General',
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      stars: typeof body.stars === 'number' ? body.stars : 0,
+      status: body.status || 'Active',
+      githubUrl: body.githubUrl?.trim() || undefined,
+      demoUrl: body.demoUrl?.trim() || undefined,
+      thumbnail: body.thumbnail?.trim() || undefined,
+      isPublished: body.isPublished !== false
+    });
+
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to create project' }, { status: 500 });
@@ -49,8 +100,31 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
     if (!body.id) {
-      return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Project ID is required' }, { status: 400 });
     }
+
+    if (body.action === 'toggle-publish') {
+      const updated = db.togglePublishProject(body.id);
+      if (!updated) {
+        return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    if (body.githubUrl && !isValidUrl(body.githubUrl)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid GitHub URL. Must be a valid HTTP/HTTPS link.' },
+        { status: 400 }
+      );
+    }
+
+    if (body.demoUrl && !isValidUrl(body.demoUrl)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid Demo URL. Must be a valid HTTP/HTTPS link.' },
+        { status: 400 }
+      );
+    }
+
     const updated = db.updateProject(body.id, body);
     if (!updated) {
       return NextResponse.json({ success: false, error: 'Project not found' }, { status: 404 });
@@ -74,7 +148,7 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) {
-      return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Project ID required' }, { status: 400 });
     }
     const deleted = db.deleteProject(id);
     return NextResponse.json({ success: deleted });

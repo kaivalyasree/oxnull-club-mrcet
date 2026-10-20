@@ -98,11 +98,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     (p) =>
       p.title.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
-      p.techStack.some((t) => t.toLowerCase().includes(q))
+      (p.techStack || p.tags || []).some((t) => t.toLowerCase().includes(q))
   ).map((p) => ({
     id: p.id,
     title: p.title,
-    subtitle: `${p.domainName} • Stack: ${p.techStack.join(', ')}`,
+    subtitle: `${p.domainName || 'General'} • Stack: ${(p.techStack || p.tags || []).join(', ')}`,
     badge: 'Project',
     href: `/projects`,
     icon: FolderGit2,

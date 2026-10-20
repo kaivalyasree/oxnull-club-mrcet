@@ -18,11 +18,13 @@ import {
 import { db } from '../lib/store';
 import { GET as getApplications, PATCH as patchApplications, POST as postApplication } from '../app/api/applications/route';
 import { GET as getUserProgress, POST as postUserProgress } from '../app/api/user-progress/route';
-import { POST as postResource, DELETE as deleteResource } from '../app/api/resources/route';
+import { GET as getResources, POST as postResource, PUT as putResource, DELETE as deleteResource } from '../app/api/resources/route';
 import { POST as postActivity, DELETE as deleteActivity } from '../app/api/activities/route';
 import { POST as postAnnouncement, DELETE as deleteAnnouncement } from '../app/api/announcements/route';
-import { POST as postProject } from '../app/api/projects/route';
-import { POST as postCertification } from '../app/api/certifications/route';
+import { GET as getProjects, POST as postProject, PUT as putProject, DELETE as deleteProject } from '../app/api/projects/route';
+import { GET as getCertifications, POST as postCertification, PUT as putCertification, DELETE as deleteCertification } from '../app/api/certifications/route';
+import { DOMAINS, LEARNING_SUBJECTS } from '../lib/data';
+import { generateStaticParams as generateSubjectParams } from '../app/learn/[subject]/page';
 
 interface TestResult {
   name: string;
@@ -501,6 +503,314 @@ async function runTestSuite() {
     heroContent.includes('OXNULL is a cybersecurity club dedicated to exploring security') &&
     heroContent.includes('Learn together, develop practical expertise, and turn your interest'),
     'Hero section includes exact approved four-line club introduction'
+  );
+
+  // ---------------------------------------------------------------------------
+  // GROUP 8: Domain Ordering, Subject Pages, Designer Credit & CMS CRUD Lifecycle
+  // ---------------------------------------------------------------------------
+  console.log('\n--- TEST GROUP 8: Domain Order, Subject Hubs, Designer Credit & CMS Upgrade ---');
+
+  // 8.1 Domain Ordering: Awareness #1, Explore #2
+  assert(
+    DOMAINS[0].slug === 'awareness' && DOMAINS[0].number === '01',
+    'Domain 01 is strictly Awareness in DOMAINS array'
+  );
+  assert(
+    DOMAINS[1].slug === 'explore' && DOMAINS[1].number === '02',
+    'Domain 02 is strictly Explore in DOMAINS array'
+  );
+
+  const navbarContent = fs.readFileSync(path.join(cwd, 'components/Navbar.tsx'), 'utf-8');
+  assert(
+    navbarContent.includes("name: '01 · Awareness'") && navbarContent.includes("name: '02 · Explore'"),
+    'Navbar domain links list Awareness first (01) and Explore second (02)'
+  );
+
+  // 8.2 Removal of Unwanted Boxed Content from Domain Detail Page
+  const domainPageContent = fs.readFileSync(path.join(cwd, 'app/domains/[slug]/page.tsx'), 'utf-8');
+  assert(
+    !domainPageContent.includes('<DomainPersonalitySection') &&
+    !domainPageContent.includes("import DomainPersonalitySection"),
+    'DomainPersonalitySection boxed widget is completely removed from domain detail page'
+  );
+
+  // 8.3 Explore Domain Cleaned Up (no AI, satellite, prompt injection)
+  const exploreDomain = DOMAINS.find((d) => d.slug === 'explore');
+  const exploreJson = JSON.stringify(exploreDomain || {});
+  assert(
+    !exploreJson.toLowerCase().includes('satellite') &&
+    !exploreJson.toLowerCase().includes('aerospace') &&
+    !exploreJson.toLowerCase().includes('telemetry') &&
+    !exploreJson.toLowerCase().includes('prompt injection'),
+    'Explore domain is strictly focused on club discovery, leadership & communication (AI and satellite removed)'
+  );
+
+  // 8.4 Learn Page: Exactly 4 Subjects, No Computer Fundamentals
+  const learnContent = fs.readFileSync(path.join(cwd, 'app/learn/page.tsx'), 'utf-8');
+  assert(
+    !learnContent.includes('Computer Fundamentals'),
+    'Computer Fundamentals is completely removed from visible learning options on /learn'
+  );
+  assert(
+    LEARNING_SUBJECTS.length === 4 &&
+    LEARNING_SUBJECTS.map((s) => s.slug).join(',') === 'linux,networking,operating-system,security-fundamentals',
+    'Four visible learning subjects configured: Linux, Networking, Operating System, Security Fundamentals'
+  );
+
+  // 8.5 Dedicated Learning Subject Routes
+  const subjectParams = generateSubjectParams();
+  assert(
+    subjectParams.length === 4 &&
+    subjectParams.some((p) => p.subject === 'linux') &&
+    subjectParams.some((p) => p.subject === 'networking') &&
+    subjectParams.some((p) => p.subject === 'operating-system') &&
+    subjectParams.some((p) => p.subject === 'security-fundamentals'),
+    'generateStaticParams() for /learn/[subject] generates all 4 dedicated subject pages'
+  );
+
+  // 8.6 Designer Credit Update: S.Kaivalya -> S.Kaivalya Sri
+  const footerCode = fs.readFileSync(path.join(cwd, 'components/Footer.tsx'), 'utf-8');
+  const aboutCode = fs.readFileSync(path.join(cwd, 'app/about/page.tsx'), 'utf-8');
+  assert(
+    footerCode.includes('S.Kaivalya Sri') &&
+    aboutCode.toUpperCase().includes('S. KAIVALYA SRI'),
+    'Designer credit is updated to "S.Kaivalya Sri" in Footer and About page'
+  );
+  assert(
+    !footerCode.includes('Designed by S.Kaivalya"') && !aboutCode.includes('Designed by S.Kaivalya"'),
+    'Old "S.Kaivalya" attribution without "Sri" does not exist in credit links'
+  );
+
+  // 8.7 Admin CMS CRUD Lifecycle: Resources
+  const testResPayload = {
+    title: 'Audit Test Resource Automated',
+    domainId: 'd6',
+    domainName: 'Awareness',
+    subjectId: 'linux',
+    subjectName: 'Linux',
+    category: 'Walkthrough',
+    difficulty: 'Intermediate',
+    url: 'https://example.com/audit-test-walkthrough',
+    description: 'Automated test walkthrough for audit verification',
+    isPublished: true,
+    tags: ['Audit', 'Testing']
+  };
+
+  // POST with Admin Cookie
+  const resCreateRes = await postResource(
+    new Request('http://localhost:3000/api/resources', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify(testResPayload)
+    })
+  );
+  const dataCreateRes = await resCreateRes.json();
+  assert(
+    resCreateRes.status === 201 && dataCreateRes.success && Boolean(dataCreateRes.data?.id),
+    'Admin creates new resource record via POST /api/resources (201)'
+  );
+
+  const createdResId = dataCreateRes.data?.id;
+
+  // Verify public GET returns this published resource
+  const publicResGet = await getResources(new Request('http://localhost:3000/api/resources?subjectId=linux'));
+  const publicResData = await publicResGet.json();
+  assert(
+    publicResData.success && publicResData.data.some((r: any) => r.id === createdResId),
+    'Public GET /api/resources returns newly published resource under its subject'
+  );
+
+  // Toggle publish status to draft
+  const putResToggle = await putResource(
+    new Request('http://localhost:3000/api/resources', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ id: createdResId, action: 'toggle-publish' })
+    })
+  );
+  const dataPutRes = await putResToggle.json();
+  assert(
+    putResToggle.status === 200 && dataPutRes.data?.isPublished === false,
+    'Admin toggles resource status to draft (isPublished: false) via PUT /api/resources'
+  );
+
+  // Verify public GET now HIDES the draft resource
+  const publicResGetAfterDraft = await getResources(new Request('http://localhost:3000/api/resources?subjectId=linux'));
+  const publicResDataAfterDraft = await publicResGetAfterDraft.json();
+  assert(
+    publicResDataAfterDraft.success && !publicResDataAfterDraft.data.some((r: any) => r.id === createdResId),
+    'Public GET /api/resources strictly hides draft/unpublished resource from regular visitors'
+  );
+
+  // Admin GET with all=true STILL sees the draft
+  const adminResGetAll = await getResources(
+    new Request('http://localhost:3000/api/resources?all=true', {
+      headers: { cookie: adminCookie }
+    })
+  );
+  const adminResDataAll = await adminResGetAll.json();
+  assert(
+    adminResDataAll.success && adminResDataAll.data.some((r: any) => r.id === createdResId),
+    'Admin GET /api/resources?all=true with admin cookie sees both published and draft resources'
+  );
+
+  // Delete created test resource
+  const delResReq = await deleteResource(
+    new Request(`http://localhost:3000/api/resources?id=${createdResId}`, {
+      method: 'DELETE',
+      headers: { cookie: adminCookie }
+    })
+  );
+  const delResData = await delResReq.json();
+  assert(
+    delResReq.status === 200 && delResData.success === true,
+    'Admin deletes resource record with valid session cookie'
+  );
+
+  // 8.8 Admin CMS CRUD Lifecycle: Certifications
+  const testCertPayload = {
+    name: 'Audit Test Security Credential',
+    provider: 'Audit Authority',
+    domainId: 'd6',
+    domainName: 'Awareness',
+    level: 'Beginner',
+    cost: 'Free',
+    url: 'https://example.com/audit-cert',
+    description: 'Audit test credential description',
+    isPublished: true,
+    tags: ['Audit', 'Cert']
+  };
+
+  const createCertRes = await postCertification(
+    new Request('http://localhost:3000/api/certifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify(testCertPayload)
+    })
+  );
+  const dataCreateCert = await createCertRes.json();
+  assert(
+    createCertRes.status === 201 && dataCreateCert.success && Boolean(dataCreateCert.data?.id),
+    'Admin creates new certification record via POST /api/certifications (201)'
+  );
+
+  const createdCertId = dataCreateCert.data?.id;
+
+  // Toggle publish on certification
+  const toggleCertRes = await putCertification(
+    new Request('http://localhost:3000/api/certifications', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ id: createdCertId, action: 'toggle-publish' })
+    })
+  );
+  const dataToggleCert = await toggleCertRes.json();
+  assert(
+    toggleCertRes.status === 200 && dataToggleCert.data?.isPublished === false,
+    'Admin toggles certification to draft status via PUT /api/certifications'
+  );
+
+  // Delete certification
+  const delCertRes = await deleteCertification(
+    new Request(`http://localhost:3000/api/certifications?id=${createdCertId}`, {
+      method: 'DELETE',
+      headers: { cookie: adminCookie }
+    })
+  );
+  assert(
+    delCertRes.status === 200,
+    'Admin deletes certification record via DELETE /api/certifications'
+  );
+
+  // 8.9 Admin CMS CRUD Lifecycle: Projects
+  const testProjPayload = {
+    title: 'Audit Test Security Repo',
+    description: 'Audit test toolchain for verification',
+    domainId: 'd1',
+    domainName: 'Red & Blue Team',
+    status: 'Active',
+    githubUrl: 'https://github.com/oxnull-club/audit-repo',
+    tags: ['Audit', 'Tooling'],
+    isPublished: true
+  };
+
+  const createProjRes = await postProject(
+    new Request('http://localhost:3000/api/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify(testProjPayload)
+    })
+  );
+  const dataCreateProj = await createProjRes.json();
+  assert(
+    createProjRes.status === 201 && dataCreateProj.success && Boolean(dataCreateProj.data?.id),
+    'Admin creates new project record via POST /api/projects (201)'
+  );
+
+  const createdProjId = dataCreateProj.data?.id;
+
+  // Toggle publish on project
+  const toggleProjRes = await putProject(
+    new Request('http://localhost:3000/api/projects', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({ id: createdProjId, action: 'toggle-publish' })
+    })
+  );
+  const dataToggleProj = await toggleProjRes.json();
+  assert(
+    toggleProjRes.status === 200 && dataToggleProj.data?.isPublished === false,
+    'Admin toggles project to draft status via PUT /api/projects'
+  );
+
+  // Delete project
+  const delProjRes = await deleteProject(
+    new Request(`http://localhost:3000/api/projects?id=${createdProjId}`, {
+      method: 'DELETE',
+      headers: { cookie: adminCookie }
+    })
+  );
+  assert(
+    delProjRes.status === 200,
+    'Admin deletes project record via DELETE /api/projects'
+  );
+
+  // 8.10 URL Validation Check
+  const invalidUrlRes = await postResource(
+    new Request('http://localhost:3000/api/resources', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: adminCookie
+      },
+      body: JSON.stringify({
+        title: 'Malicious Link Test',
+        domainId: 'd1',
+        url: 'javascript:alert(1)'
+      })
+    })
+  );
+  assert(
+    invalidUrlRes.status === 400,
+    'POST /api/resources rejects invalid/malicious URL schemes with 400 Bad Request'
   );
 
   // Clean up any test records created during test run to maintain a pristine database

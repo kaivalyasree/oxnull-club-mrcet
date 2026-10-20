@@ -160,7 +160,7 @@ export default function Footer() {
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-xs font-semibold tracking-wider text-[#151417]">
               <span>M. Mani Vardhan Reddy</span>
               <span className="text-[#C89D3C]/50">•</span>
-              <span>S. Kaivalya</span>
+              <span>S.Kaivalya Sri</span>
               <span className="text-[#C89D3C]/50">•</span>
               <span>D. Aravind Koushik</span>
             </div>

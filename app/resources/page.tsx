@@ -37,7 +37,7 @@ export default function ResourcesPage() {
       const match =
         res.title.toLowerCase().includes(q) ||
         res.description.toLowerCase().includes(q) ||
-        res.domainName.toLowerCase().includes(q);
+        (res.domainName ? res.domainName.toLowerCase().includes(q) : false);
       if (!match) return false;
     }
     return true;

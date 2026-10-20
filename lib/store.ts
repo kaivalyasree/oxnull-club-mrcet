@@ -129,15 +129,26 @@ export const db = {
     return store.domains[index];
   },
 
-  // Resources (Published content only)
-  getResources(): Resource[] {
-    return ensureDataFile().resources;
+  // Resources
+  getResources(options?: { publishedOnly?: boolean; domainId?: string; subjectId?: string }): Resource[] {
+    let list = ensureDataFile().resources;
+    if (options?.publishedOnly) {
+      list = list.filter((r) => r.isPublished !== false);
+    }
+    if (options?.domainId) {
+      list = list.filter((r) => r.domainId === options.domainId);
+    }
+    if (options?.subjectId) {
+      list = list.filter((r) => r.subjectId === options.subjectId);
+    }
+    return list;
   },
   addResource(item: Omit<Resource, 'id'>): Resource {
     const store = ensureDataFile();
     const newResource: Resource = {
       ...item,
-      id: `r-${Date.now()}`
+      id: `r-${Date.now()}`,
+      isPublished: item.isPublished !== false
     };
     store.resources.unshift(newResource);
     writeDataFile(store);
@@ -148,6 +159,15 @@ export const db = {
     const index = store.resources.findIndex((r) => r.id === id);
     if (index === -1) return null;
     store.resources[index] = { ...store.resources[index], ...updated };
+    writeDataFile(store);
+    return store.resources[index];
+  },
+  togglePublishResource(id: string): Resource | null {
+    const store = ensureDataFile();
+    const index = store.resources.findIndex((r) => r.id === id);
+    if (index === -1) return null;
+    const current = store.resources[index].isPublished !== false;
+    store.resources[index].isPublished = !current;
     writeDataFile(store);
     return store.resources[index];
   },
@@ -163,14 +183,22 @@ export const db = {
   },
 
   // Certifications
-  getCertifications(): Certification[] {
-    return ensureDataFile().certifications;
+  getCertifications(options?: { publishedOnly?: boolean; domainId?: string }): Certification[] {
+    let list = ensureDataFile().certifications;
+    if (options?.publishedOnly) {
+      list = list.filter((c) => c.isPublished !== false);
+    }
+    if (options?.domainId) {
+      list = list.filter((c) => c.domainId === options.domainId);
+    }
+    return list;
   },
   addCertification(item: Omit<Certification, 'id'>): Certification {
     const store = ensureDataFile();
     const newCert: Certification = {
       ...item,
-      id: `c-${Date.now()}`
+      id: `c-${Date.now()}`,
+      isPublished: item.isPublished !== false
     };
     store.certifications.unshift(newCert);
     writeDataFile(store);
@@ -181,6 +209,15 @@ export const db = {
     const index = store.certifications.findIndex((c) => c.id === id);
     if (index === -1) return null;
     store.certifications[index] = { ...store.certifications[index], ...updated };
+    writeDataFile(store);
+    return store.certifications[index];
+  },
+  togglePublishCertification(id: string): Certification | null {
+    const store = ensureDataFile();
+    const index = store.certifications.findIndex((c) => c.id === id);
+    if (index === -1) return null;
+    const current = store.certifications[index].isPublished !== false;
+    store.certifications[index].isPublished = !current;
     writeDataFile(store);
     return store.certifications[index];
   },
@@ -196,14 +233,22 @@ export const db = {
   },
 
   // Projects
-  getProjects(): Project[] {
-    return ensureDataFile().projects;
+  getProjects(options?: { publishedOnly?: boolean; domainId?: string }): Project[] {
+    let list = ensureDataFile().projects;
+    if (options?.publishedOnly) {
+      list = list.filter((p) => p.isPublished !== false);
+    }
+    if (options?.domainId) {
+      list = list.filter((p) => p.domainId === options.domainId);
+    }
+    return list;
   },
   addProject(item: Omit<Project, 'id'>): Project {
     const store = ensureDataFile();
     const newProj: Project = {
       ...item,
-      id: `p-${Date.now()}`
+      id: `p-${Date.now()}`,
+      isPublished: item.isPublished !== false
     };
     store.projects.unshift(newProj);
     writeDataFile(store);
@@ -214,6 +259,15 @@ export const db = {
     const index = store.projects.findIndex((p) => p.id === id);
     if (index === -1) return null;
     store.projects[index] = { ...store.projects[index], ...updated };
+    writeDataFile(store);
+    return store.projects[index];
+  },
+  togglePublishProject(id: string): Project | null {
+    const store = ensureDataFile();
+    const index = store.projects.findIndex((p) => p.id === id);
+    if (index === -1) return null;
+    const current = store.projects[index].isPublished !== false;
+    store.projects[index].isPublished = !current;
     writeDataFile(store);
     return store.projects[index];
   },

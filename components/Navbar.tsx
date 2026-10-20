@@ -48,13 +48,13 @@ export default function Navbar() {
   ];
 
   const domainLinks = [
-    { name: '01 · Red & Blue Team', href: '/domains/red-blue-team' },
-    { name: '02 · Digital Forensics', href: '/domains/digital-forensics' },
-    { name: '03 · Cryptography', href: '/domains/cryptography' },
-    { name: '04 · Cloud Security', href: '/domains/cloud-security' },
-    { name: '05 · Security Architecture', href: '/domains/security-architecture' },
-    { name: '06 · Awareness', href: '/domains/awareness' },
-    { name: '07 · Explore Track', href: '/domains/explore' }
+    { name: '01 · Awareness', href: '/domains/awareness' },
+    { name: '02 · Explore', href: '/domains/explore' },
+    { name: '03 · Red & Blue Team', href: '/domains/red-blue-team' },
+    { name: '04 · Digital Forensics', href: '/domains/digital-forensics' },
+    { name: '05 · Cryptography', href: '/domains/cryptography' },
+    { name: '06 · Cloud Security', href: '/domains/cloud-security' },
+    { name: '07 · Security Architecture', href: '/domains/security-architecture' }
   ];
 
   return (

@@ -53,7 +53,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 
         {/* Tech Stack Pills */}
         <div className="flex flex-wrap gap-1.5 mb-4">
-          {project.techStack.map((tech) => (
+          {(project.techStack || project.tags || []).map((tech) => (
             <span
               key={tech}
               className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#FAF7F2] text-[#47434E] border border-[#E8D8C3]"

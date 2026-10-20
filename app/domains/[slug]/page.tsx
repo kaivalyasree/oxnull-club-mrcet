@@ -5,22 +5,13 @@ import DomainHero from '@/components/DomainHero';
 import ResourceCard from '@/components/ResourceCard';
 import CertificationCard from '@/components/CertificationCard';
 import ProjectCard from '@/components/ProjectCard';
-import DomainPersonalitySection from '@/components/DomainPersonalitySection';
 import { DOMAINS, Domain } from '@/lib/data';
 import { db } from '@/lib/store';
 import {
-  Compass,
   BookOpen,
   Award,
   FolderGit2,
-  CheckCircle2,
-  ArrowRight,
-  Shield,
-  Layers,
-  Terminal,
-  Activity as ActivityIcon,
-  Sparkles,
-  Plus
+  ArrowRight
 } from 'lucide-react';
 
 export function generateStaticParams() {
@@ -56,10 +47,16 @@ export default async function DomainDetailPage({
     notFound();
   }
 
-  // Filter domain-specific items from backend database store
-  const domainResources = db.getResources().filter((r) => r.domainId === domain.id);
-  const domainCertifications = db.getCertifications().filter((c) => c.domainId === domain.id);
-  const domainProjects = db.getProjects().filter((p) => p.domainId === domain.id);
+  // Filter domain-specific published items from backend database store
+  const domainResources = db.getResources().filter(
+    (r) => r.domainId === domain.id && r.isPublished !== false
+  );
+  const domainCertifications = db.getCertifications().filter(
+    (c) => c.domainId === domain.id && c.isPublished !== false
+  );
+  const domainProjects = db.getProjects().filter(
+    (p) => p.domainId === domain.id && p.isPublished !== false
+  );
 
   return (
     <div className="min-h-screen pb-24">
@@ -81,9 +78,6 @@ export default async function DomainDetailPage({
             </p>
           </div>
         </section>
-
-        {/* Bespoke Interactive Domain Personality Section */}
-        <DomainPersonalitySection domain={domain} />
 
         {/* C. Focus Areas */}
         <section id="focus-areas" className="scroll-mt-24">
