@@ -737,5 +737,7 @@
       "completedFoundationIds": [],
       "notes": ""
     }
-  }
+  },
+  "trackEnrollments": [],
+  "customTracks": []
 }

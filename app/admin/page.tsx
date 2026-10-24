@@ -13,7 +13,7 @@ import {
   Activity,
   Announcement
 } from '@/lib/data';
-import type { ClubApplication } from '@/lib/store';
+import type { ClubApplication, TrackEnrollment } from '@/lib/store';
 import {
   ShieldCheck,
   Plus,
@@ -51,19 +51,16 @@ import {
   Cpu
 } from 'lucide-react';
 
+import AdminSidebar, { AdminTab } from '@/components/admin/AdminSidebar';
+import AdminHeader from '@/components/admin/AdminHeader';
+import AdminDashboardOverview from '@/components/admin/AdminDashboardOverview';
+import AdminEnrollmentManager from '@/components/admin/AdminEnrollmentManager';
+import AdminStudentManager from '@/components/admin/AdminStudentManager';
+import AdminTrackManager from '@/components/admin/AdminTrackManager';
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<
-    | 'overview'
-    | 'resources'
-    | 'certifications'
-    | 'projects'
-    | 'subjects'
-    | 'domains'
-    | 'uploads'
-    | 'activities'
-    | 'announcements'
-    | 'applications'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Server-Verified Administrator Session State
   const [adminSession, setAdminSession] = useState<{ username?: string; email?: string; role: 'admin' } | null>(null);
@@ -75,6 +72,11 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  // High-Priority Enrollment & Student Data States
+  const [enrollments, setEnrollments] = useState<TrackEnrollment[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [tracksList, setTracksList] = useState<any[]>([]);
 
   // Core CMS Data States
   const [applications, setApplications] = useState<ClubApplication[]>([]);
@@ -217,7 +219,19 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
-      const [resApps, resR, resP, resC, resA, resAnn, resSubs, resDoms] = await Promise.all([
+      const [
+        resApps,
+        resR,
+        resP,
+        resC,
+        resA,
+        resAnn,
+        resSubs,
+        resDoms,
+        resEnrs,
+        resStuds,
+        resTracks
+      ] = await Promise.all([
         fetch('/api/applications').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/resources?all=true').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/projects?all=true').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
@@ -225,8 +239,12 @@ export default function AdminPage() {
         fetch('/api/activities').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/announcements').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/learning-subjects').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
-        fetch('/api/domains').then((r) => r.json()).catch(() => ({ success: false, data: [] }))
+        fetch('/api/domains').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
+        fetch('/api/enrollments').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
+        fetch('/api/admin/students').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
+        fetch('/api/tracks').then((r) => r.json()).catch(() => ({ success: false, data: [] }))
       ]);
+
       if (resApps.success) setApplications(resApps.data);
       if (resR.success) setResources(resR.data);
       if (resP.success) setProjects(resP.data);
@@ -238,6 +256,15 @@ export default function AdminPage() {
       }
       if (resDoms.success && Array.isArray(resDoms.data) && resDoms.data.length > 0) {
         setDomainsList(resDoms.data);
+      }
+      if (resEnrs.success && Array.isArray(resEnrs.data)) {
+        setEnrollments(resEnrs.data);
+      }
+      if (resStuds.success && Array.isArray(resStuds.data)) {
+        setStudents(resStuds.data);
+      }
+      if (resTracks.success && Array.isArray(resTracks.data)) {
+        setTracksList(resTracks.data);
       }
     } catch (e) {
       console.error(e);
@@ -293,6 +320,81 @@ export default function AdminPage() {
     setAdminUsername('');
     setAdminPassword('');
     setAuthError(null);
+  };
+
+  // High-Priority Enrollment Mutations
+  const handleUpdateEnrollmentStatus = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const res = await fetch('/api/enrollments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Enrollment status updated to ${status}.`);
+        setEnrollments((prev) =>
+          prev.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  status,
+                  reviewedBy: adminSession?.username || 'Executive Admin',
+                  reviewedAt: new Date().toISOString()
+                }
+              : e
+          )
+        );
+      } else {
+        showToast(data.error || 'Failed to update enrollment status', 'error');
+      }
+    } catch {
+      showToast('Network error updating enrollment status', 'error');
+    }
+  };
+
+  // Track Mutations (with referential integrity support)
+  const handleSaveTrack = async (trackData: any, mode: 'add' | 'edit'): Promise<boolean> => {
+    try {
+      const method = mode === 'add' ? 'POST' : 'PUT';
+      const res = await fetch('/api/tracks', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trackData)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Track "${trackData.name}" saved successfully.`);
+        loadAllData();
+        return true;
+      } else {
+        showToast(data.error || 'Failed to save track', 'error');
+        return false;
+      }
+    } catch {
+      showToast('Network error saving track', 'error');
+      return false;
+    }
+  };
+
+  const handleDeleteTrack = async (trackId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/tracks?id=${encodeURIComponent(trackId)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Track deleted successfully.');
+        loadAllData();
+        return true;
+      } else {
+        showToast(data.error || 'Failed to delete track', 'error');
+        return false;
+      }
+    } catch {
+      showToast('Network error deleting track', 'error');
+      return false;
+    }
   };
 
   // Resource Operations
@@ -432,7 +534,7 @@ export default function AdminPage() {
     setCertFormName(cert.name);
     setCertFormProvider(cert.provider);
     setCertFormDomain(cert.domainId || 'd6');
-    setCertFormUrl(cert.url);
+    setCertFormUrl(cert.url || '');
     setCertFormLevel(cert.level);
     setCertFormCost(cert.cost || 'Paid');
     setCertFormDesc(cert.description);
@@ -442,12 +544,12 @@ export default function AdminPage() {
     setCertModalMode('edit');
   };
 
-  const handleSaveCertification = async (e: React.FormEvent) => {
+  const handleSaveCert = async (e: React.FormEvent) => {
     e.preventDefault();
     setCertFormError(null);
 
     if (!certFormName.trim() || !certFormProvider.trim()) {
-      setCertFormError('Certification title and issuing organization are required.');
+      setCertFormError('Credential name and issuing provider are required.');
       return;
     }
 
@@ -464,7 +566,7 @@ export default function AdminPage() {
       domainName: domainObj?.name || 'General Track',
       level: certFormLevel,
       cost: certFormCost,
-      url: certFormUrl.trim() || '#',
+      url: certFormUrl.trim() || undefined,
       description: certFormDesc.trim(),
       tags: tagsArray,
       isPublished: certFormIsPublished
@@ -479,11 +581,11 @@ export default function AdminPage() {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          showToast(`Certification "${payload.name}" added successfully.`);
+          showToast(`Certification "${payload.name}" created successfully.`);
           setCertModalMode(null);
           loadAllData();
         } else {
-          setCertFormError(data.error || 'Failed to add certification.');
+          setCertFormError(data.error || 'Failed to create certification.');
         }
       } else if (certModalMode === 'edit' && currentCertId) {
         const res = await fetch('/api/certifications', {
@@ -599,11 +701,11 @@ export default function AdminPage() {
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          showToast(`Project "${payload.title}" added successfully.`);
+          showToast(`Project "${payload.title}" created successfully.`);
           setProjModalMode(null);
           loadAllData();
         } else {
-          setProjFormError(data.error || 'Failed to add project.');
+          setProjFormError(data.error || 'Failed to create project.');
         }
       } else if (projModalMode === 'edit' && currentProjId) {
         const res = await fetch('/api/projects', {
@@ -637,14 +739,14 @@ export default function AdminPage() {
         showToast(`Project "${title}" is now ${currentStatus ? 'Unpublished (Draft)' : 'Published'}.`);
         loadAllData();
       } else {
-        showToast(data.error || 'Failed to toggle publication', 'error');
+        showToast(data.error || 'Failed to toggle project publication', 'error');
       }
     } catch {
       showToast('Network error updating status', 'error');
     }
   };
 
-  // Subject Edit Operations
+  // Learning Subject Operations
   const openEditSubjectModal = (subj: LearningSubject) => {
     setSubjectEditModal(subj);
     setSubFormTitle(subj.title);
@@ -660,45 +762,47 @@ export default function AdminPage() {
     if (!subjectEditModal) return;
     setSubFormError(null);
 
-    const concepts = subFormKeyConcepts
+    const keyConceptsList = subFormKeyConcepts
       .split('\n')
-      .map((c) => c.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
+
+    const payload = {
+      slug: subjectEditModal.slug,
+      title: subFormTitle.trim(),
+      subtitle: subFormSubtitle.trim(),
+      description: subFormDesc.trim(),
+      keyConcepts: keyConceptsList,
+      handsOnLab: subFormLab.trim()
+    };
 
     try {
       const res = await fetch('/api/learning-subjects', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug: subjectEditModal.slug,
-          title: subFormTitle.trim(),
-          subtitle: subFormSubtitle.trim(),
-          description: subFormDesc.trim(),
-          keyConcepts: concepts,
-          handsOnLab: subFormLab.trim()
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(`Subject "${subFormTitle}" updated successfully.`);
+        showToast(`Curriculum for "${payload.title}" updated.`);
         setSubjectEditModal(null);
         loadAllData();
       } else {
-        setSubFormError(data.error || 'Failed to update subject.');
+        setSubFormError(data.error || 'Failed to update learning subject.');
       }
     } catch {
-      setSubFormError('Network error updating subject.');
+      setSubFormError('Network communication error updating syllabus.');
     }
   };
 
-  // Domain Edit Operations
+  // Domain Metadata Operations
   const openEditDomainModal = (dom: Domain) => {
     setDomainEditModal(dom);
     setDomFormName(dom.name);
     setDomFormBadge(dom.badge);
     setDomFormTagline(dom.tagline);
-    setDomFormOverview(dom.overview || '');
-    setDomFormFocusAreas((dom.focusAreas || []).join('\n'));
+    setDomFormOverview(dom.overview);
+    setDomFormFocusAreas(Array.isArray(dom.focusAreas) ? dom.focusAreas.join(', ') : '');
     setDomFormError(null);
   };
 
@@ -707,34 +811,36 @@ export default function AdminPage() {
     if (!domainEditModal) return;
     setDomFormError(null);
 
-    const areas = domFormFocusAreas
-      .split('\n')
-      .map((a) => a.trim())
+    const focusAreasList = domFormFocusAreas
+      .split(',')
+      .map((s) => s.trim())
       .filter(Boolean);
+
+    const payload = {
+      slug: domainEditModal.slug,
+      name: domFormName.trim(),
+      badge: domFormBadge.trim(),
+      tagline: domFormTagline.trim(),
+      overview: domFormOverview.trim(),
+      focusAreas: focusAreasList
+    };
 
     try {
       const res = await fetch('/api/domains', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug: domainEditModal.slug,
-          name: domFormName.trim(),
-          badge: domFormBadge.trim(),
-          tagline: domFormTagline.trim(),
-          overview: domFormOverview.trim(),
-          focusAreas: areas
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(`Domain "${domFormName}" updated successfully.`);
+        showToast(`Domain "${payload.name}" metadata updated.`);
         setDomainEditModal(null);
         loadAllData();
       } else {
         setDomFormError(data.error || 'Failed to update domain.');
       }
     } catch {
-      setDomFormError('Network error updating domain.');
+      setDomFormError('Network error updating domain metadata.');
     }
   };
 
@@ -752,25 +858,12 @@ export default function AdminPage() {
     setActivityModalMode('add');
   };
 
-  const openEditActivityModal = (act: Activity) => {
-    setCurrentActivityId(act.id);
-    setActFormTitle(act.title);
-    setActFormSubtitle(act.subtitle || '');
-    setActFormType(act.type || 'Technical');
-    setActFormFrequency(act.frequency || 'Weekly');
-    setActFormDesc(act.summary || act.description || '');
-    setActFormParticipants(act.participants || 'All Members');
-    setActFormDomain(act.domainId || 'd1');
-    setActFormError(null);
-    setActivityModalMode('edit');
-  };
-
   const handleSaveActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     setActFormError(null);
 
     if (!actFormTitle.trim() || !actFormDesc.trim()) {
-      setActFormError('Title and description are required.');
+      setActFormError('Activity title and description are required.');
       return;
     }
 
@@ -779,54 +872,90 @@ export default function AdminPage() {
       subtitle: actFormSubtitle.trim(),
       type: actFormType,
       frequency: actFormFrequency,
-      summary: actFormDesc.trim(),
       description: actFormDesc.trim(),
       participants: actFormParticipants.trim(),
       domainId: actFormDomain
     };
 
     try {
-      if (activityModalMode === 'add') {
-        const res = await fetch('/api/activities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          showToast(`Activity "${payload.title}" created successfully.`);
-          setActivityModalMode(null);
-          loadAllData();
-        } else {
-          setActFormError(data.error || 'Failed to create activity.');
-        }
-      } else if (activityModalMode === 'edit' && currentActivityId) {
-        const res = await fetch('/api/activities', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentActivityId, ...payload })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          showToast(`Activity "${payload.title}" updated successfully.`);
-          setActivityModalMode(null);
-          loadAllData();
-        } else {
-          setActFormError(data.error || 'Failed to update activity.');
-        }
+      const res = await fetch('/api/activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Activity "${payload.title}" created.`);
+        setActivityModalMode(null);
+        loadAllData();
+      } else {
+        setActFormError(data.error || 'Failed to create activity.');
       }
     } catch {
-      setActFormError('Network error saving activity.');
+      setActFormError('Network error creating activity.');
     }
   };
 
-  // Upload Handler
+  // Announcement Operations
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnTitle.trim() || !newAnnContent.trim()) {
+      showToast('Title and content are required for announcements.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newAnnTitle.trim(),
+          tag: newAnnTag,
+          content: newAnnContent.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Announcement broadcasted successfully.');
+        setNewAnnTitle('');
+        setNewAnnContent('');
+        setShowAddAnn(false);
+        loadAllData();
+      } else {
+        showToast(data.error || 'Failed to post announcement.', 'error');
+      }
+    } catch {
+      showToast('Network error posting announcement.', 'error');
+    }
+  };
+
+  // Application Status Review
+  const handleUpdateAppStatus = async (id: string, status: 'approved' | 'rejected' | 'pending') => {
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Application status updated to ${status}.`);
+        loadAllData();
+      } else {
+        showToast(data.error || 'Failed to update application.', 'error');
+      }
+    } catch {
+      showToast('Network error updating application.', 'error');
+    }
+  };
+
+  // Upload Asset
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
     setUploadError(null);
+    setIsUploading(true);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -838,146 +967,84 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setUploadedFiles((prev) => [
-          {
-            url: data.url,
-            fileName: data.fileName,
-            originalName: data.originalName,
-            sizeBytes: data.sizeBytes,
-            uploadedAt: new Date().toLocaleTimeString()
-          },
-          ...prev
-        ]);
-        showToast(`File "${data.originalName}" uploaded successfully.`);
+        showToast(`Asset "${file.name}" uploaded successfully.`);
+        setUploadedFiles((prev) => [data.data, ...prev]);
+        e.target.value = '';
       } else {
-        setUploadError(data.error || 'Upload failed.');
+        setUploadError(data.error || 'Failed to upload asset.');
       }
     } catch {
       setUploadError('Network error uploading file.');
     } finally {
       setIsUploading(false);
-      e.target.value = '';
     }
   };
 
-  const copyToClipboard = (url: string) => {
+  const handleCopyUrl = (url: string) => {
     navigator.clipboard.writeText(url);
     setCopiedUrl(url);
     setTimeout(() => setCopiedUrl(null), 2500);
   };
 
-  // Delete Execution Handler (Modal Confirmed)
+  // Generic Delete Execution
   const handleExecuteDelete = async () => {
     if (!deleteConfirmation) return;
     const { type, id, title } = deleteConfirmation;
 
-    try {
-      let endpoint = '';
-      if (type === 'resource') endpoint = `/api/resources?id=${id}`;
-      else if (type === 'certification') endpoint = `/api/certifications?id=${id}`;
-      else if (type === 'project') endpoint = `/api/projects?id=${id}`;
-      else if (type === 'announcement') endpoint = `/api/announcements?id=${id}`;
-      else if (type === 'activity') endpoint = `/api/activities?id=${id}`;
+    let endpoint = '';
+    if (type === 'resource') endpoint = `/api/resources?id=${id}`;
+    if (type === 'certification') endpoint = `/api/certifications?id=${id}`;
+    if (type === 'project') endpoint = `/api/projects?id=${id}`;
+    if (type === 'announcement') endpoint = `/api/announcements?id=${id}`;
+    if (type === 'activity') endpoint = `/api/activities?id=${id}`;
 
+    try {
       const res = await fetch(endpoint, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast(`Successfully deleted ${type} "${title}".`);
+        showToast(`${type} "${title}" deleted.`);
         setDeleteConfirmation(null);
         loadAllData();
       } else {
         showToast(data.error || `Failed to delete ${type}`, 'error');
       }
     } catch {
-      showToast('Network error during deletion', 'error');
+      showToast(`Network error deleting ${type}`, 'error');
     }
   };
 
-  // Application Status Change
-  const handleUpdateAppStatus = async (appId: string, status: 'approved' | 'rejected' | 'pending') => {
-    try {
-      const res = await fetch('/api/applications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationId: appId, status })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        showToast(`Application marked as ${status}.`);
-        loadAllData();
-      } else {
-        showToast(data.error || 'Failed to update application status', 'error');
-      }
-    } catch {
-      showToast('Network error updating application', 'error');
-    }
-  };
-
-  // Announcement Creation
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAnnTitle || !newAnnContent) return;
-
-    try {
-      const res = await fetch('/api/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newAnnTitle.trim(),
-          tag: newAnnTag.trim(),
-          content: newAnnContent.trim(),
-          author: adminSession?.username || 'Executive Admin'
-        })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        showToast('Announcement broadcasted successfully.');
-        setNewAnnTitle('');
-        setNewAnnContent('');
-        setShowAddAnn(false);
-        loadAllData();
-      } else {
-        showToast(data.error || 'Failed to publish announcement', 'error');
-      }
-    } catch {
-      showToast('Network error publishing announcement', 'error');
-    }
-  };
-
+  // LOADING CHECK ON MOUNT
   if (isCheckingSession) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="w-8 h-8 animate-spin text-[#C89D3C]" />
-          <p className="text-xs font-semibold text-[#8C6B1B]">Verifying administrative gateway...</p>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass-card rounded-3xl p-8 max-w-sm w-full text-center space-y-4 border-[#D4AF37]/40">
+          <div className="w-12 h-12 rounded-2xl bg-[#151417] text-[#FAF7F2] flex items-center justify-center mx-auto border border-[#D4AF37]">
+            <RefreshCw className="w-6 h-6 animate-spin text-[#E5C378]" />
+          </div>
+          <h2 className="text-sm font-bold text-[#151417] uppercase tracking-wider">
+            Verifying Admin Session...
+          </h2>
         </div>
       </div>
     );
   }
 
-  // LOGIN FORM: If unauthenticated, show username & password gateway
+  // LOGIN SCREEN IF UNAUTHENTICATED
   if (!adminSession) {
     return (
-      <div className="min-h-[85vh] flex items-center justify-center py-16 px-4 sm:px-6">
-        <div className="w-full max-w-md">
-          <div className="glass-card rounded-3xl p-8 sm:p-10 border-[#D4AF37]/40 shadow-xl space-y-8 bg-gradient-to-b from-white via-[#FAF7F2] to-[#F5EBDD]/50 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#D4AF37]/10 rounded-full blur-2xl pointer-events-none" />
-
-            <div className="text-center space-y-3 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-[#151417] text-[#FAF7F2] flex items-center justify-center mx-auto border border-[#D4AF37]/50 shadow-md">
-                <Lock className="w-7 h-7 text-[#E5C378]" />
-              </div>
-              <span className="text-[10px] font-mono font-bold tracking-[0.25em] uppercase text-[#967223] block">
-                Executive Portal
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-[#151417] tracking-tight">
-                0XNULL Admin Login
-              </h1>
-              <p className="text-xs text-[#55505C] leading-relaxed">
-                Enter your authorized administrator credentials to manage club resources, certifications, projects, and admissions.
-              </p>
+      <div className="min-h-screen py-16 px-4 sm:px-6 flex items-center justify-center">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-2xl bg-[#151417] text-[#FAF7F2] flex items-center justify-center font-bold text-2xl border border-[#D4AF37] mx-auto shadow-md">
+              <Lock className="w-8 h-8 text-[#E5C378]" />
             </div>
+            <h1 className="text-2xl font-black text-[#151417] tracking-tight">0XNULL Administration</h1>
+            <p className="text-xs text-[#645E6D]">
+              Authorized executive access. All actions are logged and audit-stamped.
+            </p>
+          </div>
 
+          <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37]/40 bg-white/90 shadow-xl space-y-6">
             {authError && (
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -985,20 +1052,18 @@ export default function AdminPage() {
               </div>
             )}
 
-            <form onSubmit={handleAdminLogin} className="space-y-4 relative z-10 text-xs">
+            <form onSubmit={handleAdminLogin} className="space-y-4 text-xs">
               <div className="space-y-1.5">
                 <label className="font-bold text-[#151417] block">Administrator Username</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={adminUsername}
-                    onChange={(e) => setAdminUsername(e.target.value)}
-                    placeholder="e.g. Kaivalya sri"
-                    autoComplete="username"
-                    className="w-full pl-3.5 pr-4 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] outline-none focus:border-[#C89D3C] transition-colors"
-                  />
-                </div>
+                <input
+                  type="text"
+                  required
+                  value={adminUsername}
+                  onChange={(e) => setAdminUsername(e.target.value)}
+                  placeholder="e.g. Kaivalya sri"
+                  autoComplete="username"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] outline-none focus:border-[#C89D3C]"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -1011,7 +1076,7 @@ export default function AdminPage() {
                     onChange={(e) => setAdminPassword(e.target.value)}
                     placeholder="••••••••••••"
                     autoComplete="current-password"
-                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] outline-none focus:border-[#C89D3C] transition-colors"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#E8D8C3] bg-white text-xs text-[#151417] outline-none focus:border-[#C89D3C]"
                   />
                   <button
                     type="button"
@@ -1053,1281 +1118,892 @@ export default function AdminPage() {
     );
   }
 
-  // MAIN ADMIN DASHBOARD
+  // MAIN REBUILT ADMIN INTERFACE
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6 max-w-7xl mx-auto space-y-8">
-      {/* Admin Header */}
-      <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37]/40 bg-gradient-to-r from-white via-[#FAF7F2] to-[#F5EBDD]/60 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#151417] text-[#E5C378] flex items-center justify-center font-bold text-2xl border border-[#D4AF37]">
-            <ShieldCheck className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black text-[#151417]">Admin CMS Portal</h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                Authorized Executive
-              </span>
-            </div>
-            <p className="text-xs text-[#645E6D] mt-0.5">
-              Active Administrator: <strong className="text-[#151417]">{adminSession.username || adminSession.email}</strong>
-            </p>
-          </div>
-        </div>
+    <div className="min-h-screen flex bg-[#FAF7F2]">
+      {/* Desktop Persistent Sidebar + Mobile Drawer */}
+      <AdminSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        mobileOpen={mobileSidebarOpen}
+        setMobileOpen={setMobileSidebarOpen}
+        adminUsername={adminSession.username || adminSession.email}
+        pendingEnrollmentsCount={enrollments.filter((e) => e.status === 'pending').length}
+        totalEnrollmentsCount={enrollments.length}
+        pendingApplicationsCount={applications.filter((a) => a.status === 'pending').length}
+        resourcesCount={resources.length}
+        certificationsCount={certifications.length}
+        projectsCount={projects.length}
+        onLogout={handleAdminLogout}
+      />
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={loadAllData}
-            disabled={isLoading}
-            className="p-2.5 rounded-xl bg-white border border-[#E8D8C3] text-[#8C6B1B] hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-            title="Refresh database records"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
-          <Link
-            href="/"
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-white border border-[#E8D8C3] text-[#151417] hover:bg-[#FAF7F2] transition-colors"
-          >
-            Public Site
-          </Link>
-          <button
-            onClick={handleAdminLogout}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors flex items-center gap-1.5 cursor-pointer"
-            title="Terminate administrator session"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </div>
+      {/* Main Content Pane */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <AdminHeader
+          activeTab={activeTab}
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+          onRefreshData={loadAllData}
+          isLoading={isLoading}
+          onLogout={handleAdminLogout}
+          adminUsername={adminSession.username || adminSession.email}
+        />
 
-      {/* Toast Alert Banner */}
-      {statusMessage && (
-        <div
-          className={`p-4 rounded-2xl text-xs font-semibold flex items-center justify-between border ${
-            statusMessage.type === 'error'
-              ? 'bg-rose-50 border-rose-200 text-rose-800'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {statusMessage.type === 'error' ? (
-              <AlertTriangle className="w-4 h-4 text-rose-600" />
-            ) : (
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
-            )}
-            <span>{statusMessage.text}</span>
-          </div>
-          <button onClick={() => setStatusMessage(null)} className="hover:opacity-75">
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#E8D8C3] pb-3 overflow-x-auto text-xs font-bold uppercase tracking-wider">
-        {[
-          { id: 'overview', label: 'Overview Metrics', icon: Layers },
-          { id: 'resources', label: `Resources (${resources.length})`, icon: BookOpen },
-          { id: 'certifications', label: `Certifications (${certifications.length})`, icon: Award },
-          { id: 'projects', label: `Projects (${projects.length})`, icon: FolderGit2 },
-          { id: 'subjects', label: `Learn Subjects (${subjects.length})`, icon: Terminal },
-          { id: 'domains', label: `Domains (${domainsList.length})`, icon: Compass },
-          { id: 'uploads', label: 'Storage & Assets', icon: Upload },
-          { id: 'activities', label: `Activities (${activities.length})`, icon: Calendar },
-          { id: 'announcements', label: `Announcements (${announcements.length})`, icon: Megaphone },
-          { id: 'applications', label: `Applications (${applications.length})`, icon: Users }
-        ].map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-[#151417] text-[#FAF7F2]'
-                  : 'text-[#645E6D] hover:bg-[#FAF7F2] hover:text-[#151417]'
+        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
+          {/* Toast Alert Banner */}
+          {statusMessage && (
+            <div
+              className={`p-4 rounded-2xl text-xs font-semibold flex items-center justify-between border ${
+                statusMessage.type === 'error'
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
               }`}
             >
-              <Icon className="w-3.5 h-3.5 text-[#C89D3C]" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* TAB 1: OVERVIEW METRICS */}
-      {activeTab === 'overview' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="glass-card rounded-2xl p-5 border-[#E8D8C3]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#8A8592] block">Resources</span>
-              <div className="text-3xl font-black text-[#151417] mt-1">{resources.length}</div>
-              <div className="text-[11px] text-[#8C6B1B] font-semibold mt-1">
-                {resources.filter((r) => r.isPublished !== false).length} published • {resources.filter((r) => r.isPublished === false).length} drafts
+              <div className="flex items-center gap-2">
+                {statusMessage.type === 'error' ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                ) : (
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                )}
+                <span>{statusMessage.text}</span>
               </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-5 border-[#E8D8C3]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#8A8592] block">Certifications</span>
-              <div className="text-3xl font-black text-[#151417] mt-1">{certifications.length}</div>
-              <div className="text-[11px] text-[#8C6B1B] font-semibold mt-1">
-                {certifications.filter((c) => c.isPublished !== false).length} published
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-5 border-[#E8D8C3]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#8A8592] block">Projects</span>
-              <div className="text-3xl font-black text-[#151417] mt-1">{projects.length}</div>
-              <div className="text-[11px] text-[#8C6B1B] font-semibold mt-1">
-                {projects.filter((p) => p.isPublished !== false).length} published
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-5 border-[#E8D8C3]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#8A8592] block">Domains & Subjects</span>
-              <div className="text-3xl font-black text-[#151417] mt-1">{domainsList.length + subjects.length}</div>
-              <div className="text-[11px] text-[#8C6B1B] font-semibold mt-1">
-                7 Domains • 4 Learn Subjects
-              </div>
-            </div>
-
-            <div className="glass-card rounded-2xl p-5 border-[#E8D8C3]">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-[#8A8592] block">Applications</span>
-              <div className="text-3xl font-black text-[#151417] mt-1">{applications.length}</div>
-              <div className="text-[11px] text-[#8C6B1B] font-semibold mt-1">
-                {applications.filter((a) => a.status === 'pending').length} pending review
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Action Hub */}
-          <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#E8D8C3] space-y-4">
-            <h3 className="text-lg font-black text-[#151417]">CMS Quick Management Hub</h3>
-            <p className="text-xs text-[#55505C]">
-              Publish new resources, assign credentials to domains, update curriculum syllabi, or upload diagrams directly into Supabase.
-            </p>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <button
-                onClick={() => openAddResourceModal()}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#151417] text-white hover:bg-[#2A2830] transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-[#E5C378]" />
-                <span>Add Resource</span>
+              <button onClick={() => setStatusMessage(null)} className="hover:opacity-75">
+                ✕
               </button>
-              <button
-                onClick={() => openAddCertModal()}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E8D8C3] text-[#151417] hover:bg-[#FAF7F2] transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Award className="w-4 h-4 text-[#C89D3C]" />
-                <span>Add Certification</span>
-              </button>
-              <button
-                onClick={() => openAddProjectModal()}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E8D8C3] text-[#151417] hover:bg-[#FAF7F2] transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <FolderGit2 className="w-4 h-4 text-[#C89D3C]" />
-                <span>Add Project</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('subjects')}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E8D8C3] text-[#151417] hover:bg-[#FAF7F2] transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Terminal className="w-4 h-4 text-[#C89D3C]" />
-                <span>Manage Learn Curriculum</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('domains')}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-[#E8D8C3] text-[#151417] hover:bg-[#FAF7F2] transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Compass className="w-4 h-4 text-[#C89D3C]" />
-                <span>Manage 7 Domains</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('uploads')}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#FAF7F2] border border-[#D4AF37] text-[#8C6B1B] hover:bg-white transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Upload className="w-4 h-4 text-[#C89D3C]" />
-                <span>Upload Document / Diagram</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: RESOURCES CMS */}
-      {activeTab === 'resources' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Resources Library CMS</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Curated whitepapers, tools, walkthroughs, and cheat sheets assigned to domains and learning subjects.
-              </p>
-            </div>
-            <button
-              onClick={() => openAddResourceModal()}
-              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4 text-[#E5C378]" />
-              <span>Add Resource</span>
-            </button>
-          </div>
-
-          {/* Filters Bar */}
-          <div className="glass-card rounded-2xl p-4 border-[#E8D8C3] flex flex-col md:flex-row gap-3 items-center justify-between">
-            <div className="relative w-full md:w-72">
-              <Search className="w-4 h-4 text-[#8A8592] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search resources by title, domain, or subject..."
-                value={resSearchQuery}
-                onChange={(e) => setResSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none focus:border-[#C89D3C]"
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto text-xs">
-              {/* Domain Filter */}
-              <select
-                value={resDomainFilter}
-                onChange={(e) => setResDomainFilter(e.target.value)}
-                className="p-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none"
-              >
-                <option value="all">All Domains</option>
-                {domainsList.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.number} · {d.name}
-                  </option>
-                ))}
-              </select>
-
-              {/* Subject Filter */}
-              <select
-                value={resSubjectFilter}
-                onChange={(e) => setResSubjectFilter(e.target.value)}
-                className="p-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none"
-              >
-                <option value="all">All Subjects</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.number} · {s.title}
-                  </option>
-                ))}
-              </select>
-
-              {/* Status Filter */}
-              {(['all', 'published', 'draft'] as const).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setResStatusFilter(st)}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold capitalize transition-colors cursor-pointer ${
-                    resStatusFilter === st
-                      ? 'bg-[#151417] text-[#FAF7F2]'
-                      : 'bg-white border border-[#E8D8C3] text-[#645E6D] hover:bg-[#FAF7F2]'
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Resources Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border-[#E8D8C3]">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F5EBDD] text-[#8C6B1B] font-bold uppercase tracking-wider border-b border-[#E8D8C3]">
-                <tr>
-                  <th className="p-3.5">Title</th>
-                  <th className="p-3.5">Domain / Subject</th>
-                  <th className="p-3.5">Category</th>
-                  <th className="p-3.5">Difficulty</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8D8C3]/50">
-                {resources
-                  .filter((res) => {
-                    if (resStatusFilter === 'published' && res.isPublished === false) return false;
-                    if (resStatusFilter === 'draft' && res.isPublished !== false) return false;
-                    if (resDomainFilter !== 'all' && res.domainId !== resDomainFilter) return false;
-                    if (resSubjectFilter !== 'all' && res.subjectId !== resSubjectFilter) return false;
-                    if (resSearchQuery.trim()) {
-                      const q = resSearchQuery.toLowerCase();
-                      const match =
-                        res.title.toLowerCase().includes(q) ||
-                        (res.domainName && res.domainName.toLowerCase().includes(q)) ||
-                        (res.subjectName && res.subjectName.toLowerCase().includes(q));
-                      if (!match) return false;
-                    }
-                    return true;
-                  })
-                  .map((res) => {
-                    const isPub = res.isPublished !== false;
-                    return (
-                      <tr key={res.id} className="hover:bg-[#FAF7F2]/60 transition-colors">
-                        <td className="p-3.5">
-                          <div className="font-bold text-[#151417]">{res.title}</div>
-                          <div className="text-[11px] text-[#8A8592] truncate max-w-xs">{res.description}</div>
-                        </td>
-                        <td className="p-3.5">
-                          <div className="font-semibold text-[#151417]">{res.domainName || 'General'}</div>
-                          {res.subjectName && (
-                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-[#E8D8C3]/60 text-[#8C6B1B]">
-                              Subject: {res.subjectName}
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-[#55505C]">{res.category}</td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
-                            {res.difficulty}
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider border ${
-                              isPub
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}
-                          >
-                            {isPub ? 'Published' : 'Draft'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => handleTogglePublishResource(res.id, isPub, res.title)}
-                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                              isPub
-                                ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-                            }`}
-                            title={isPub ? 'Unpublish (Make Draft)' : 'Publish to website'}
-                          >
-                            {isPub ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                          <button
-                            onClick={() => openEditResourceModal(res)}
-                            className="p-1.5 rounded-lg border border-[#E8D8C3] bg-white text-[#151417] hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                            title="Edit resource"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setDeleteConfirmation({
-                                isOpen: true,
-                                type: 'resource',
-                                id: res.id,
-                                title: res.title
-                              })
-                            }
-                            className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
-                            title="Delete resource"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: CERTIFICATIONS CMS */}
-      {activeTab === 'certifications' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Certifications Roadmap CMS</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Industry credentials mapped to student capability stages and cybersecurity domains.
-              </p>
-            </div>
-            <button
-              onClick={() => openAddCertModal()}
-              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4 text-[#E5C378]" />
-              <span>Add Certification</span>
-            </button>
-          </div>
-
-          {/* Filters */}
-          <div className="glass-card rounded-2xl p-4 border-[#E8D8C3] flex flex-col md:flex-row gap-3 items-center justify-between">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-[#8A8592]">Filter Domain:</span>
-              <select
-                value={certDomainFilter}
-                onChange={(e) => setCertDomainFilter(e.target.value)}
-                className="p-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none"
-              >
-                <option value="all">All Domains</option>
-                {domainsList.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.number} · {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-[#8A8592]">Status:</span>
-              {(['all', 'published', 'draft'] as const).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setCertStatusFilter(st)}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold capitalize transition-colors cursor-pointer ${
-                    certStatusFilter === st
-                      ? 'bg-[#151417] text-[#FAF7F2]'
-                      : 'bg-white border border-[#E8D8C3] text-[#645E6D] hover:bg-[#FAF7F2]'
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Certifications Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border-[#E8D8C3]">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F5EBDD] text-[#8C6B1B] font-bold uppercase tracking-wider border-b border-[#E8D8C3]">
-                <tr>
-                  <th className="p-3.5">Name</th>
-                  <th className="p-3.5">Provider</th>
-                  <th className="p-3.5">Domain</th>
-                  <th className="p-3.5">Level</th>
-                  <th className="p-3.5">Cost</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8D8C3]/50">
-                {certifications
-                  .filter((cert) => {
-                    if (certStatusFilter === 'published' && cert.isPublished === false) return false;
-                    if (certStatusFilter === 'draft' && cert.isPublished !== false) return false;
-                    if (certDomainFilter !== 'all' && cert.domainId !== certDomainFilter) return false;
-                    return true;
-                  })
-                  .map((cert) => {
-                    const isPub = cert.isPublished !== false;
-                    return (
-                      <tr key={cert.id} className="hover:bg-[#FAF7F2]/60 transition-colors">
-                        <td className="p-3.5">
-                          <div className="font-bold text-[#151417]">{cert.name}</div>
-                          <div className="text-[11px] text-[#8A8592] truncate max-w-xs">{cert.description}</div>
-                        </td>
-                        <td className="p-3.5 font-semibold text-[#151417]">{cert.provider}</td>
-                        <td className="p-3.5 text-[#55505C]">{cert.domainName || 'General'}</td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
-                            {cert.level}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-[#55505C]">{cert.cost || 'Paid'}</td>
-                        <td className="p-3.5">
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider border ${
-                              isPub
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}
-                          >
-                            {isPub ? 'Published' : 'Draft'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => handleTogglePublishCert(cert.id, isPub, cert.name)}
-                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                              isPub
-                                ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-                            }`}
-                            title={isPub ? 'Unpublish' : 'Publish'}
-                          >
-                            {isPub ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                          <button
-                            onClick={() => openEditCertModal(cert)}
-                            className="p-1.5 rounded-lg border border-[#E8D8C3] bg-white text-[#151417] hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setDeleteConfirmation({
-                                isOpen: true,
-                                type: 'certification',
-                                id: cert.id,
-                                title: cert.name
-                              })
-                            }
-                            className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: PROJECTS CMS */}
-      {activeTab === 'projects' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Member Security Projects CMS</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Open-source toolchains, forensic parsers, and honeypots authored by club working groups.
-              </p>
-            </div>
-            <button
-              onClick={() => openAddProjectModal()}
-              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4 text-[#E5C378]" />
-              <span>Add Project</span>
-            </button>
-          </div>
-
-          {/* Filters */}
-          <div className="glass-card rounded-2xl p-4 border-[#E8D8C3] flex flex-col md:flex-row gap-3 items-center justify-between">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-[#8A8592]">Filter Domain:</span>
-              <select
-                value={projDomainFilter}
-                onChange={(e) => setProjDomainFilter(e.target.value)}
-                className="p-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none"
-              >
-                <option value="all">All Domains</option>
-                {domainsList.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.number} · {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-[#8A8592]">Status:</span>
-              {(['all', 'published', 'draft'] as const).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setProjStatusFilter(st)}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold capitalize transition-colors cursor-pointer ${
-                    projStatusFilter === st
-                      ? 'bg-[#151417] text-[#FAF7F2]'
-                      : 'bg-white border border-[#E8D8C3] text-[#645E6D] hover:bg-[#FAF7F2]'
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Projects Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border-[#E8D8C3]">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F5EBDD] text-[#8C6B1B] font-bold uppercase tracking-wider border-b border-[#E8D8C3]">
-                <tr>
-                  <th className="p-3.5">Project Title</th>
-                  <th className="p-3.5">Domain</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5">Tech Stack</th>
-                  <th className="p-3.5">Publication</th>
-                  <th className="p-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8D8C3]/50">
-                {projects
-                  .filter((p) => {
-                    if (projStatusFilter === 'published' && p.isPublished === false) return false;
-                    if (projStatusFilter === 'draft' && p.isPublished !== false) return false;
-                    if (projDomainFilter !== 'all' && p.domainId !== projDomainFilter) return false;
-                    return true;
-                  })
-                  .map((proj) => {
-                    const isPub = proj.isPublished !== false;
-                    return (
-                      <tr key={proj.id} className="hover:bg-[#FAF7F2]/60 transition-colors">
-                        <td className="p-3.5">
-                          <div className="font-bold text-[#151417]">{proj.title}</div>
-                          <div className="text-[11px] text-[#8A8592] truncate max-w-xs">{proj.description}</div>
-                        </td>
-                        <td className="p-3.5 font-semibold text-[#151417]">{proj.domainName || 'General'}</td>
-                        <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
-                            {proj.status}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-[#55505C]">
-                          {(proj.techStack || proj.tags || []).slice(0, 3).join(', ')}
-                        </td>
-                        <td className="p-3.5">
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider border ${
-                              isPub
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}
-                          >
-                            {isPub ? 'Published' : 'Draft'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => handleTogglePublishProject(proj.id, isPub, proj.title)}
-                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                              isPub
-                                ? 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-                                : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-                            }`}
-                            title={isPub ? 'Unpublish' : 'Publish'}
-                          >
-                            {isPub ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                          <button
-                            onClick={() => openEditProjectModal(proj)}
-                            className="p-1.5 rounded-lg border border-[#E8D8C3] bg-white text-[#151417] hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setDeleteConfirmation({
-                                isOpen: true,
-                                type: 'project',
-                                id: proj.id,
-                                title: proj.title
-                              })
-                            }
-                            className="p-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: LEARNING SUBJECTS CMS */}
-      {activeTab === 'subjects' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Four Foundational Learning Subjects</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Curriculum, key concepts, hands-on labs, and subject-assigned resources for the /learn portal.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {subjects.map((subj) => {
-              const subjResources = resources.filter(
-                (r) => r.subjectId === subj.id || r.subjectId === subj.slug
-              );
-
-              return (
-                <div
-                  key={subj.id}
-                  className="glass-card rounded-3xl p-6 border-[#E8D8C3] flex flex-col justify-between space-y-4"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-black text-[#967223]">
-                        SUBJECT {subj.number}
-                      </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
-                        {subjResources.length} Resources Attached
-                      </span>
-                    </div>
-
-                    <h4 className="text-xl font-black text-[#151417]">{subj.title}</h4>
-                    <p className="text-xs font-semibold text-[#8C6B1B]">{subj.subtitle}</p>
-                    <p className="text-xs text-[#55505C] leading-relaxed">{subj.description}</p>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1">
-                        Key Concepts ({subj.keyConcepts.length})
-                      </span>
-                      <ul className="space-y-1 text-xs text-[#151417]">
-                        {subj.keyConcepts.map((kc, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <span className="text-[#C89D3C]">✓</span>
-                            <span>{kc}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E8D8C3]">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#967223] block mb-1">
-                        Hands-On Lab
-                      </span>
-                      <p className="text-xs text-[#151417] font-medium">{subj.handsOnLab}</p>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-[#E8D8C3] flex items-center justify-between gap-2">
-                    <Link
-                      href={`/learn/${subj.slug}`}
-                      target="_blank"
-                      className="text-xs font-bold text-[#8C6B1B] hover:text-[#151417] flex items-center gap-1"
-                    >
-                      <span>Preview Hub</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openAddResourceModal({ subjectId: subj.id })}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3] hover:bg-white flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Resource</span>
-                      </button>
-                      <button
-                        onClick={() => openEditSubjectModal(subj)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#151417] text-white hover:bg-[#2A2830] flex items-center gap-1 cursor-pointer"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-[#E5C378]" />
-                        <span>Edit Syllabus</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 6: DOMAINS CMS */}
-      {activeTab === 'domains' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Seven Cybersecurity Domains CMS</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Overview text, focus areas, badges, and learning pathway stages for each of the 7 tracks.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {domainsList.map((dom) => {
-              const domResCount = resources.filter((r) => r.domainId === dom.id).length;
-              const domCertCount = certifications.filter((c) => c.domainId === dom.id).length;
-              const domProjCount = projects.filter((p) => p.domainId === dom.id).length;
-
-              return (
-                <div
-                  key={dom.id}
-                  className="glass-card rounded-3xl p-6 border-[#E8D8C3] flex flex-col lg:flex-row lg:items-start justify-between gap-6"
-                >
-                  <div className="space-y-2 max-w-3xl">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-black text-[#967223]">
-                        DOMAIN {dom.number}
-                      </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
-                        {dom.badge}
-                      </span>
-                    </div>
-
-                    <h4 className="text-xl font-black text-[#151417]">{dom.name}</h4>
-                    <p className="text-xs font-semibold text-[#8C6B1B]">{dom.tagline}</p>
-                    <p className="text-xs text-[#55505C] leading-relaxed">{dom.overview}</p>
-
-                    <div className="pt-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1">
-                        Focus Areas ({(dom.focusAreas || []).length})
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(dom.focusAreas || []).map((fa, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 rounded text-[11px] bg-white border border-[#E8D8C3] text-[#151417]"
-                          >
-                            {fa}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-xs font-semibold text-[#8A8592] pt-2">
-                      <span>{domResCount} Resources</span>
-                      <span>•</span>
-                      <span>{domCertCount} Certifications</span>
-                      <span>•</span>
-                      <span>{domProjCount} Projects</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0">
-                    <Link
-                      href={`/domains/${dom.slug}`}
-                      target="_blank"
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-center bg-white border border-[#E8D8C3] text-[#8C6B1B] hover:bg-[#FAF7F2] flex items-center justify-center gap-1.5"
-                    >
-                      <span>View Hub</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                    <button
-                      onClick={() => openAddResourceModal({ domainId: dom.id })}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-center bg-[#FAF7F2] border border-[#E8D8C3] text-[#151417] hover:bg-white flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-[#C89D3C]" />
-                      <span>Add Resource</span>
-                    </button>
-                    <button
-                      onClick={() => openEditDomainModal(dom)}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-center bg-[#151417] text-white hover:bg-[#2A2830] flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-[#E5C378]" />
-                      <span>Edit Domain</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 7: STORAGE & ASSETS CMS */}
-      {activeTab === 'uploads' && (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-xl font-bold text-[#151417]">Storage & Club Assets</h3>
-            <p className="text-xs text-[#645E6D] mt-0.5">
-              Securely upload diagrams, thumbnails, cheat sheets, and PDF whitepapers directly into the Supabase &lsquo;club-assets&rsquo; storage bucket.
-            </p>
-          </div>
-
-          {/* Upload Area */}
-          <div className="glass-card rounded-3xl p-8 border-dashed border-2 border-[#D4AF37] text-center space-y-4 bg-[#FAF7F2]/50">
-            <div className="w-14 h-14 rounded-2xl bg-white border border-[#E8D8C3] flex items-center justify-center mx-auto text-[#C89D3C] shadow-sm">
-              <Upload className="w-7 h-7" />
-            </div>
-
-            <div className="space-y-1">
-              <h4 className="text-base font-bold text-[#151417]">Upload New Document or Diagram</h4>
-              <p className="text-xs text-[#55505C]">
-                Supported: PNG, JPEG, WebP, SVG, and PDF documents. Maximum file size: 10 MB.
-              </p>
-            </div>
-
-            {uploadError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold max-w-md mx-auto">
-                {uploadError}
-              </div>
-            )}
-
-            <div>
-              <label className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#151417] text-[#FAF7F2] font-bold text-xs uppercase tracking-wider hover:bg-[#2A2830] transition-colors cursor-pointer shadow-md">
-                <Upload className="w-4 h-4 text-[#E5C378]" />
-                <span>{isUploading ? 'Uploading to Bucket...' : 'Select File to Upload'}</span>
-                <input
-                  type="file"
-                  disabled={isUploading}
-                  onChange={handleFileUpload}
-                  accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Uploaded Files Table */}
-          {uploadedFiles.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold text-[#151417]">Recently Uploaded Assets</h4>
-              <div className="glass-card rounded-2xl overflow-hidden border-[#E8D8C3]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#F5EBDD] text-[#8C6B1B] font-bold uppercase tracking-wider border-b border-[#E8D8C3]">
-                    <tr>
-                      <th className="p-3.5">Asset File</th>
-                      <th className="p-3.5">Size</th>
-                      <th className="p-3.5">Uploaded</th>
-                      <th className="p-3.5 text-right">Direct Public URL</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E8D8C3]/50">
-                    {uploadedFiles.map((f, i) => (
-                      <tr key={i} className="hover:bg-[#FAF7F2]/60">
-                        <td className="p-3.5 font-bold text-[#151417]">{f.originalName}</td>
-                        <td className="p-3.5 text-[#55505C]">{(f.sizeBytes / 1024).toFixed(1)} KB</td>
-                        <td className="p-3.5 text-[#8A8592]">{f.uploadedAt}</td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => copyToClipboard(f.url)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3] hover:bg-white inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            {copiedUrl === f.url ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                <span className="text-emerald-700">Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" />
-                                <span>Copy Link</span>
-                              </>
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* TAB 8: ACTIVITIES CMS */}
-      {activeTab === 'activities' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Activities & Tactical Sessions CMS</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Manage club workshops, CTF scrimmages, labs, and peer roundtable sessions.
-              </p>
-            </div>
-            <button
-              onClick={() => openAddActivityModal()}
-              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[#E5C378]" />
-              <span>Add Activity</span>
-            </button>
-          </div>
+          {/* SECTION 1: OVERVIEW METRICS DASHBOARD */}
+          {activeTab === 'overview' && (
+            <AdminDashboardOverview
+              enrollments={enrollments}
+              studentsCount={students.length || applications.length}
+              domainsCount={domainsList.length}
+              tracksCount={tracksList.length || 21}
+              resourcesCount={resources.length}
+              certificationsCount={certifications.length}
+              projectsCount={projects.length}
+              setActiveTab={setActiveTab}
+              onOpenAddResource={() => openAddResourceModal()}
+              onOpenAddCert={() => openAddCertModal()}
+              onOpenAddProject={() => openAddProjectModal()}
+            />
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activities.map((act) => (
-              <div
-                key={act.id}
-                className="glass-card rounded-2xl p-5 border-[#E8D8C3] flex flex-col justify-between space-y-3"
-              >
+          {/* SECTION 2: TRACK ENROLLMENT MANAGEMENT (HIGHEST PRIORITY) */}
+          {activeTab === 'enrollments' && (
+            <AdminEnrollmentManager
+              enrollments={enrollments}
+              onUpdateStatus={handleUpdateEnrollmentStatus}
+              isLoading={isLoading}
+            />
+          )}
+
+          {/* SECTION 3: STUDENT DIRECTORY */}
+          {activeTab === 'students' && (
+            <AdminStudentManager
+              students={students}
+              isLoading={isLoading}
+            />
+          )}
+
+          {/* SECTION 4: DOMAINS & CORE TRACKS MANAGEMENT */}
+          {activeTab === 'domains-tracks' && (
+            <AdminTrackManager
+              domains={domainsList}
+              tracks={tracksList.length > 0 ? tracksList : DOMAINS.flatMap((d) => d.tracks || [])}
+              enrollments={enrollments}
+              onSaveTrack={handleSaveTrack}
+              onDeleteTrack={handleDeleteTrack}
+              onEditDomain={(dom) => openEditDomainModal(dom)}
+              showToast={showToast}
+            />
+          )}
+
+          {/* SECTION 5: LEARNING SUBJECTS CMS */}
+          {activeTab === 'subjects' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F5EBDD] text-[#8C6B1B]">
-                      {act.type} • {act.frequency}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEditActivityModal(act)}
-                        className="p-1.5 text-[#645E6D] hover:text-[#151417] cursor-pointer"
-                        title="Edit activity"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setDeleteConfirmation({
-                            isOpen: true,
-                            type: 'activity',
-                            id: act.id,
-                            title: act.title
-                          })
-                        }
-                        className="p-1.5 text-rose-600 hover:text-rose-800 cursor-pointer"
-                        title="Delete activity"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <h4 className="text-base font-bold text-[#151417]">{act.title}</h4>
-                  {act.subtitle && <p className="text-xs font-semibold text-[#8C6B1B]">{act.subtitle}</p>}
-                  <p className="text-xs text-[#55505C] mt-1 leading-relaxed">
-                    {act.summary || act.description}
+                  <h3 className="text-xl font-bold text-[#151417]">Four Foundational Learning Subjects</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Curriculum, key concepts, hands-on labs, and subject-assigned resources for the /learn portal.
                   </p>
                 </div>
-
-                <div className="pt-2 border-t border-[#E8D8C3]/50 text-[11px] text-[#8A8592] flex items-center justify-between">
-                  <span>Participants: {act.participants || 'All Members'}</span>
-                  <span>ID: {act.id}</span>
-                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* TAB 9: ANNOUNCEMENTS BROADCAST */}
-      {activeTab === 'announcements' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold text-[#151417]">Broadcast Announcements</h3>
-            <button
-              onClick={() => setShowAddAnn(!showAddAnn)}
-              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[#E5C378]" />
-              <span>Publish Announcement</span>
-            </button>
-          </div>
-
-          {showAddAnn && (
-            <form
-              onSubmit={handleCreateAnnouncement}
-              className="glass-card rounded-3xl p-6 border-[#D4AF37] space-y-4 bg-white"
-            >
-              <h4 className="text-base font-bold text-[#151417]">Publish Club Bulletin</h4>
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Headline</label>
-                  <input
-                    type="text"
-                    required
-                    value={newAnnTitle}
-                    onChange={(e) => setNewAnnTitle(e.target.value)}
-                    placeholder="e.g. Next CTF Tournament Date Confirmed"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Tag</label>
-                  <input
-                    type="text"
-                    required
-                    value={newAnnTag}
-                    onChange={(e) => setNewAnnTag(e.target.value)}
-                    placeholder="e.g. Official, Competition, Workshop"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Content</label>
-                  <textarea
-                    rows={3}
-                    required
-                    value={newAnnContent}
-                    onChange={(e) => setNewAnnContent(e.target.value)}
-                    placeholder="Announcement details..."
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddAnn(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830]"
-                >
-                  Publish Broadcast
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="space-y-4">
-            {announcements.map((ann) => (
-              <div
-                key={ann.id}
-                className="glass-card rounded-2xl p-5 border-[#E8D8C3] flex items-start justify-between gap-4"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#F5EBDD] text-[#8C6B1B]">
-                      {ann.tag}
-                    </span>
-                    <span className="text-[11px] text-[#8A8592]">{ann.date}</span>
-                  </div>
-                  <h4 className="text-base font-bold text-[#151417] mt-1">{ann.title}</h4>
-                  <p className="text-xs text-[#55505C] mt-1">{ann.content}</p>
-                  <p className="text-[10px] text-[#8A8592] mt-2">Posted by {ann.author}</p>
-                </div>
-                <button
-                  onClick={() =>
-                    setDeleteConfirmation({
-                      isOpen: true,
-                      type: 'announcement',
-                      id: ann.id,
-                      title: ann.title
-                    })
-                  }
-                  className="p-1.5 text-rose-600 hover:text-rose-800 cursor-pointer"
-                  title="Delete announcement"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 10: CLUB APPLICATIONS */}
-      {activeTab === 'applications' && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold text-[#151417]">Student Membership Applications</h3>
-              <p className="text-xs text-[#645E6D] mt-0.5">
-                Review official club candidate submissions, academic roll numbers, and domain preferences.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs font-bold">
-              {(['all', 'pending', 'approved', 'rejected'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setAppFilter(filter)}
-                  className={`px-3 py-1.5 rounded-xl capitalize transition-colors cursor-pointer ${
-                    appFilter === filter
-                      ? 'bg-[#151417] text-[#FAF7F2]'
-                      : 'bg-white border border-[#E8D8C3] text-[#645E6D] hover:bg-[#FAF7F2]'
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {applications.length === 0 ? (
-            <div className="glass-card rounded-2xl p-8 text-center text-xs text-[#8A8592] border-[#E8D8C3]">
-              No membership applications received yet.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {applications
-                .filter((app) => (appFilter === 'all' ? true : app.status === appFilter))
-                .map((app) => {
-                  const domainNames = (app.domainInterests || []).map(
-                    (dId) => domainsList.find((d) => d.id === dId)?.name || dId
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {subjects.map((subj) => {
+                  const subjResources = resources.filter(
+                    (r) => r.subjectId === subj.id || r.subjectId === subj.slug
                   );
 
                   return (
                     <div
-                      key={app.id}
-                      className="glass-card rounded-2xl p-5 border-[#E8D8C3] space-y-3 hover:border-[#D4AF37]/50 transition-colors"
+                      key={subj.id}
+                      className="glass-card rounded-3xl p-6 border-[#E8D8C3] flex flex-col justify-between space-y-4"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-base font-bold text-[#151417]">{app.fullName}</h4>
-                            <span
-                              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                                app.status === 'approved'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : app.status === 'rejected'
-                                  ? 'bg-rose-50 text-rose-800 border-rose-200'
-                                  : 'bg-amber-50 text-amber-800 border-amber-200'
-                              }`}
-                            >
-                              {app.status}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#55505C]">
-                            <span>Roll: <strong className="text-[#151417]">{app.rollNumber}</strong></span>
-                            <span>•</span>
-                            <span>Branch: <strong className="text-[#151417]">{app.branch}</strong></span>
-                            <span>•</span>
-                            <span>Year: <strong className="text-[#151417]">{app.year}</strong></span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-[#967223]" />
-                              <strong>{app.phoneNumber}</strong>
-                            </span>
-                          </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-black text-[#967223]">
+                            SUBJECT {subj.number}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
+                            {subjResources.length} Resources Attached
+                          </span>
                         </div>
+
+                        <h4 className="text-xl font-black text-[#151417]">{subj.title}</h4>
+                        <p className="text-xs font-semibold text-[#8C6B1B]">{subj.subtitle}</p>
+                        <p className="text-xs text-[#55505C] leading-relaxed">{subj.description}</p>
+
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1">
+                            Key Concepts ({subj.keyConcepts.length})
+                          </span>
+                          <ul className="space-y-1 text-xs text-[#151417]">
+                            {subj.keyConcepts.map((kc, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <span className="text-[#C89D3C]">✓</span>
+                                <span>{kc}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E8D8C3]">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#967223] block mb-1">
+                            Hands-On Lab
+                          </span>
+                          <p className="text-xs text-[#151417] font-medium">{subj.handsOnLab}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-[#E8D8C3] flex items-center justify-between gap-2">
+                        <Link
+                          href={`/learn/${subj.slug}`}
+                          target="_blank"
+                          className="text-xs font-bold text-[#8C6B1B] hover:text-[#151417] flex items-center gap-1"
+                        >
+                          <span>Preview Hub</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
 
                         <div className="flex items-center gap-2">
-                          {app.status !== 'approved' && (
-                            <button
-                              onClick={() => handleUpdateAppStatus(app.id, 'approved')}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Approve</span>
-                            </button>
-                          )}
-                          {app.status !== 'rejected' && (
-                            <button
-                              onClick={() => handleUpdateAppStatus(app.id, 'rejected')}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                              <UserX className="w-3.5 h-3.5" />
-                              <span>Reject</span>
-                            </button>
-                          )}
-                          {app.status !== 'pending' && (
-                            <button
-                              onClick={() => handleUpdateAppStatus(app.id, 'pending')}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D] hover:bg-[#F5EBDD] transition-colors cursor-pointer"
-                            >
-                              Reset
-                            </button>
-                          )}
+                          <button
+                            onClick={() => openAddResourceModal({ subjectId: subj.id })}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3] hover:bg-white flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Resource</span>
+                          </button>
+                          <button
+                            onClick={() => openEditSubjectModal(subj)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#151417] text-white hover:bg-[#2A2830] flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-[#E5C378]" />
+                            <span>Edit Syllabus</span>
+                          </button>
                         </div>
-                      </div>
-
-                      {/* Domain Interests */}
-                      <div className="pt-2 border-t border-[#E8D8C3]/50">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1.5">
-                          Selected Domain Interests ({domainNames.length})
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {domainNames.map((name, i) => (
-                            <span
-                              key={i}
-                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]"
-                            >
-                              {name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="text-[10px] text-[#8A8592] flex items-center justify-between">
-                        <span>Application ID: {app.id}</span>
-                        <span>Submitted: {new Date(app.createdAt).toLocaleString()}</span>
                       </div>
                     </div>
                   );
                 })}
+              </div>
             </div>
           )}
-        </div>
-      )}
+
+          {/* SECTION 6: RESOURCES CMS */}
+          {activeTab === 'resources' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Learning Resources Library</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Curate articles, documentation, labs, and tools across domains and subjects.
+                  </p>
+                </div>
+                <button
+                  onClick={() => openAddResourceModal()}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-[#E5C378]" />
+                  <span>Add Resource</span>
+                </button>
+              </div>
+
+              {/* Resource Filter Bar */}
+              <div className="glass-card rounded-2xl p-4 border-[#E8D8C3] flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-[#8A8592] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search title/tags..."
+                      value={resSearchQuery}
+                      onChange={(e) => setResSearchQuery(e.target.value)}
+                      className="pl-8 pr-3 py-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none focus:border-[#C89D3C]"
+                    />
+                  </div>
+
+                  <select
+                    value={resStatusFilter}
+                    onChange={(e) => setResStatusFilter(e.target.value as any)}
+                    className="px-3 py-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none focus:border-[#C89D3C] cursor-pointer"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Drafts</option>
+                  </select>
+
+                  <select
+                    value={resDomainFilter}
+                    onChange={(e) => setResDomainFilter(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl border border-[#E8D8C3] bg-white text-xs outline-none focus:border-[#C89D3C] cursor-pointer"
+                  >
+                    <option value="all">All Domains</option>
+                    {domainsList.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <span className="text-[11px] text-[#8A8592] font-mono">
+                  {resources.length} Total Resources
+                </span>
+              </div>
+
+              {/* Resources Table */}
+              <div className="glass-card rounded-3xl p-6 border-[#E8D8C3] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#E8D8C3] text-[10px] uppercase font-bold text-[#8A8592]">
+                        <th className="pb-3 pr-3 font-mono">Title / Description</th>
+                        <th className="pb-3 pr-3">Domain / Subject</th>
+                        <th className="pb-3 pr-3">Category</th>
+                        <th className="pb-3 pr-3">Status</th>
+                        <th className="pb-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E8D8C3]/50">
+                      {resources
+                        .filter((r) => {
+                          if (resStatusFilter === 'published' && r.isPublished === false) return false;
+                          if (resStatusFilter === 'draft' && r.isPublished !== false) return false;
+                          if (resDomainFilter !== 'all' && r.domainId !== resDomainFilter) return false;
+                          if (
+                            resSearchQuery &&
+                            !r.title.toLowerCase().includes(resSearchQuery.toLowerCase()) &&
+                            !r.description.toLowerCase().includes(resSearchQuery.toLowerCase())
+                          )
+                            return false;
+                          return true;
+                        })
+                        .map((res) => (
+                          <tr key={res.id} className="hover:bg-[#FAF7F2]/60 transition-colors">
+                            <td className="py-3 pr-3 max-w-sm">
+                              <div className="font-bold text-[#151417] leading-snug">{res.title}</div>
+                              <p className="text-[11px] text-[#645E6D] line-clamp-1 mt-0.5">{res.description}</p>
+                            </td>
+
+                            <td className="py-3 pr-3 whitespace-nowrap">
+                              <div className="text-[#151417] font-semibold">{res.domainName || 'General'}</div>
+                              {res.subjectName && (
+                                <div className="text-[10px] text-[#8C6B1B]">Subject: {res.subjectName}</div>
+                              )}
+                            </td>
+
+                            <td className="py-3 pr-3">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
+                                {res.category}
+                              </span>
+                            </td>
+
+                            <td className="py-3 pr-3">
+                              <button
+                                onClick={() =>
+                                  handleTogglePublishResource(res.id, res.isPublished !== false, res.title)
+                                }
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                                  res.isPublished !== false
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                }`}
+                              >
+                                {res.isPublished !== false ? 'Published' : 'Draft'}
+                              </button>
+                            </td>
+
+                            <td className="py-3 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => openEditResourceModal(res)}
+                                  className="p-1.5 rounded-lg border border-[#E8D8C3] bg-white text-[#151417] hover:bg-[#FAF7F2]"
+                                  title="Edit resource"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5 text-[#C89D3C]" />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setDeleteConfirmation({
+                                      isOpen: true,
+                                      type: 'resource',
+                                      id: res.id,
+                                      title: res.title
+                                    })
+                                  }
+                                  className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                                  title="Delete resource"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 7: CERTIFICATIONS CMS */}
+          {activeTab === 'certifications' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Certification Roadmap</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Credentials, vendor accreditations, and exam tracks.
+                  </p>
+                </div>
+                <button
+                  onClick={() => openAddCertModal()}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-[#E5C378]" />
+                  <span>Add Certification</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {certifications.map((c) => (
+                  <div
+                    key={c.id}
+                    className="glass-card rounded-2xl p-5 border-[#E8D8C3] flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase text-[#967223]">
+                          {c.provider}
+                        </span>
+                        <button
+                          onClick={() => handleTogglePublishCert(c.id, c.isPublished !== false, c.name)}
+                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            c.isPublished !== false
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`}
+                        >
+                          {c.isPublished !== false ? 'Published' : 'Draft'}
+                        </button>
+                      </div>
+                      <h4 className="font-bold text-sm text-[#151417] leading-snug">{c.name}</h4>
+                      <p className="text-xs text-[#55505C] line-clamp-2 mt-1">{c.description}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-[#E8D8C3]/50 flex items-center justify-between text-xs">
+                      <span className="text-[#8C6B1B] font-semibold">{c.level}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditCertModal(c)}
+                          className="p-1.5 rounded-lg border border-[#E8D8C3] bg-white hover:bg-[#FAF7F2]"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-[#C89D3C]" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDeleteConfirmation({
+                              isOpen: true,
+                              type: 'certification',
+                              id: c.id,
+                              title: c.name
+                            })
+                          }
+                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 8: PROJECTS CMS */}
+          {activeTab === 'projects' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Student & Club Projects</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Showcase open-source tools, CTF challenge writeups, and security automation repositories.
+                  </p>
+                </div>
+                <button
+                  onClick={() => openAddProjectModal()}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-[#E5C378]" />
+                  <span>Add Project</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {projects.map((p) => (
+                  <div
+                    key={p.id}
+                    className="glass-card rounded-2xl p-5 border-[#E8D8C3] flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase text-[#967223]">
+                          {p.domainName || 'General Track'}
+                        </span>
+                        <button
+                          onClick={() => handleTogglePublishProject(p.id, p.isPublished !== false, p.title)}
+                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            p.isPublished !== false
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`}
+                        >
+                          {p.isPublished !== false ? 'Published' : 'Draft'}
+                        </button>
+                      </div>
+                      <h4 className="font-bold text-sm text-[#151417] leading-snug">{p.title}</h4>
+                      <p className="text-xs text-[#55505C] line-clamp-2 mt-1">{p.description}</p>
+                    </div>
+
+                    <div className="pt-3 border-t border-[#E8D8C3]/50 flex items-center justify-between text-xs">
+                      <span className="text-[#8C6B1B] font-semibold">{p.status}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditProjectModal(p)}
+                          className="p-1.5 rounded-lg border border-[#E8D8C3] bg-white hover:bg-[#FAF7F2]"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-[#C89D3C]" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            setDeleteConfirmation({
+                              isOpen: true,
+                              type: 'project',
+                              id: p.id,
+                              title: p.title
+                            })
+                          }
+                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 9: ACTIVITIES CMS */}
+          {activeTab === 'activities' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Club Activities & Formats</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Schedule weekly CTF scrimmages, threat intelligence debriefs, and workshops.
+                  </p>
+                </div>
+                <button
+                  onClick={openAddActivityModal}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-[#E5C378]" />
+                  <span>Create Activity</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activities.map((a) => (
+                  <div
+                    key={a.id}
+                    className="glass-card rounded-2xl p-5 border-[#E8D8C3] flex items-start justify-between gap-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#967223]">{a.number}</span>
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
+                          {a.type}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm text-[#151417] mt-1">{a.title}</h4>
+                      <p className="text-xs text-[#55505C] mt-1">{a.summary}</p>
+                      <span className="text-[10px] text-[#8A8592] mt-2 block">Cadence: {a.cadence}</span>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setDeleteConfirmation({
+                          isOpen: true,
+                          type: 'activity',
+                          id: a.id,
+                          title: a.title
+                        })
+                      }
+                      className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 10: ANNOUNCEMENTS CMS */}
+          {activeTab === 'announcements' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Executive Announcements</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Broadcast directives and notices to club members.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddAnn(!showAddAnn)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors flex items-center gap-2 cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-[#E5C378]" />
+                  <span>{showAddAnn ? 'Cancel' : 'New Announcement'}</span>
+                </button>
+              </div>
+
+              {showAddAnn && (
+                <form
+                  onSubmit={handleCreateAnnouncement}
+                  className="glass-card rounded-3xl p-6 border-[#D4AF37] bg-white space-y-4"
+                >
+                  <h4 className="font-bold text-sm text-[#151417]">Post Executive Directive</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="text-[10px] font-bold text-[#8C6B1B] uppercase block mb-1">
+                        Headline / Title *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newAnnTitle}
+                        onChange={(e) => setNewAnnTitle(e.target.value)}
+                        placeholder="e.g. Lab Schedule: Friday CTF Scrimmage"
+                        className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] text-xs outline-none focus:border-[#C89D3C]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8C6B1B] uppercase block mb-1">
+                        Category Tag
+                      </label>
+                      <select
+                        value={newAnnTag}
+                        onChange={(e) => setNewAnnTag(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] text-xs outline-none focus:border-[#C89D3C]"
+                      >
+                        <option value="Official">Official</option>
+                        <option value="Event">Event</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Competition">Competition</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-[#8C6B1B] uppercase block mb-1">
+                      Announcement Content *
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={newAnnContent}
+                      onChange={(e) => setNewAnnContent(e.target.value)}
+                      placeholder="Enter directive details, dates, and instructions for club members..."
+                      className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] text-xs outline-none focus:border-[#C89D3C]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830]"
+                    >
+                      Broadcast Announcement
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="space-y-3">
+                {announcements.map((ann) => (
+                  <div
+                    key={ann.id}
+                    className="glass-card rounded-2xl p-5 border-[#E8D8C3] flex items-start justify-between gap-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                          {ann.tag}
+                        </span>
+                        <span className="text-[10px] text-[#8A8592]">
+                          {new Date(ann.date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-sm text-[#151417] mt-1">{ann.title}</h4>
+                      <p className="text-xs text-[#55505C] mt-1">{ann.content}</p>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setDeleteConfirmation({
+                          isOpen: true,
+                          type: 'announcement',
+                          id: ann.id,
+                          title: ann.title
+                        })
+                      }
+                      className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 11: CLUB MEMBERSHIP APPLICATIONS */}
+          {activeTab === 'applications' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Student Membership Registrations</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Official club candidate submissions, academic roll numbers, and domain preferences.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-xs font-bold">
+                  {(['all', 'pending', 'approved', 'rejected'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setAppFilter(filter)}
+                      className={`px-3 py-1.5 rounded-xl capitalize transition-colors cursor-pointer ${
+                        appFilter === filter
+                          ? 'bg-[#151417] text-[#FAF7F2]'
+                          : 'bg-white border border-[#E8D8C3] text-[#645E6D] hover:bg-[#FAF7F2]'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {applications.length === 0 ? (
+                <div className="glass-card rounded-2xl p-8 text-center text-xs text-[#8A8592] border-[#E8D8C3]">
+                  No membership applications received yet.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {applications
+                    .filter((app) => (appFilter === 'all' ? true : app.status === appFilter))
+                    .map((app) => {
+                      const domainNames = (app.domainInterests || []).map(
+                        (dId) => domainsList.find((d) => d.id === dId)?.name || dId
+                      );
+
+                      return (
+                        <div
+                          key={app.id}
+                          className="glass-card rounded-2xl p-5 border-[#E8D8C3] space-y-3 hover:border-[#D4AF37]/50 transition-colors"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-base font-bold text-[#151417]">{app.fullName}</h4>
+                                <span
+                                  className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                                    app.status === 'approved'
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                      : app.status === 'rejected'
+                                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                                  }`}
+                                >
+                                  {app.status}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#55505C]">
+                                <span>Roll: <strong className="text-[#151417]">{app.rollNumber}</strong></span>
+                                <span>•</span>
+                                <span>Branch: <strong className="text-[#151417]">{app.branch}</strong></span>
+                                <span>•</span>
+                                <span>Year: <strong className="text-[#151417]">{app.year}</strong></span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-[#967223]" />
+                                  <strong>{app.phoneNumber}</strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {app.status !== 'approved' && (
+                                <button
+                                  onClick={() => handleUpdateAppStatus(app.id, 'approved')}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  <span>Approve</span>
+                                </button>
+                              )}
+                              {app.status !== 'rejected' && (
+                                <button
+                                  onClick={() => handleUpdateAppStatus(app.id, 'rejected')}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  <UserX className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                              )}
+                              {app.status !== 'pending' && (
+                                <button
+                                  onClick={() => handleUpdateAppStatus(app.id, 'pending')}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D] hover:bg-[#F5EBDD] transition-colors cursor-pointer"
+                                >
+                                  Reset
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-[#E8D8C3]/50">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1.5">
+                              Selected Domain Interests ({domainNames.length})
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {domainNames.map((name, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]"
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="text-[10px] text-[#8A8592] flex items-center justify-between">
+                            <span>Application ID: {app.id}</span>
+                            <span>Submitted: {new Date(app.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 12: STORAGE & UPLOADS */}
+          {activeTab === 'uploads' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-[#151417]">Storage & Asset Repository</h3>
+                  <p className="text-xs text-[#645E6D] mt-0.5">
+                    Direct uploads for network diagrams, lab cheatsheets, and architectural blueprints.
+                  </p>
+                </div>
+              </div>
+
+              <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37]/50 bg-white space-y-4">
+                <div className="border-2 border-dashed border-[#D4AF37]/60 rounded-2xl p-8 text-center space-y-3 bg-[#FAF7F2]/60 hover:bg-[#FAF7F2] transition-colors">
+                  <Upload className="w-10 h-10 mx-auto text-[#C89D3C]" />
+                  <div>
+                    <h4 className="text-sm font-bold text-[#151417]">Upload Multimedia Asset or Document</h4>
+                    <p className="text-xs text-[#645E6D] mt-0.5">
+                      Accepted: PNG, JPEG, WEBP, SVG, PDF (Max 10MB)
+                    </p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors cursor-pointer shadow-xs">
+                    <span>{isUploading ? 'Uploading to Server...' : 'Select File from Device'}</span>
+                    <input
+                      type="file"
+                      disabled={isUploading}
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      accept="image/*,application/pdf"
+                    />
+                  </label>
+                </div>
+
+                {uploadError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+              </div>
+
+              {uploadedFiles.length > 0 && (
+                <div className="glass-card rounded-3xl p-6 border-[#E8D8C3] space-y-3">
+                  <h4 className="font-bold text-sm text-[#151417]">Uploaded Assets This Session</h4>
+                  <div className="space-y-2">
+                    {uploadedFiles.map((file, i) => (
+                      <div
+                        key={i}
+                        className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E8D8C3] flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="truncate">
+                          <span className="font-bold text-[#151417] block truncate">{file.originalName}</span>
+                          <span className="font-mono text-[10px] text-[#8A8592] block truncate">{file.url}</span>
+                        </div>
+                        <button
+                          onClick={() => handleCopyUrl(file.url)}
+                          className="px-3 py-1 rounded-lg text-[11px] font-bold bg-[#151417] text-white hover:bg-[#2A2830] shrink-0"
+                        >
+                          {copiedUrl === file.url ? '✓ Copied' : 'Copy URL'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* RESOURCE ADD / EDIT MODAL */}
       {resourceModalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37] max-w-2xl w-full bg-white space-y-6 my-8 shadow-2xl">
+          <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37] max-w-2xl w-full bg-white space-y-6 my-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-[#E8D8C3] pb-4">
               <div>
                 <h3 className="text-lg sm:text-xl font-black text-[#151417]">
@@ -2361,69 +2037,63 @@ export default function AdminPage() {
                     required
                     value={resFormTitle}
                     onChange={(e) => setResFormTitle(e.target.value)}
-                    placeholder="e.g. Linux Kernel Memory Maps & Exploit Mitigation"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
+                    placeholder="e.g. Memory Analysis with Volatility Framework"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Domain Track</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Domain Assignment</label>
                   <select
                     value={resFormDomain}
                     onChange={(e) => setResFormDomain(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
-                    <option value="">General Track (No Domain)</option>
                     {domainsList.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.number} · {d.name}
+                        {d.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">
-                    Learning Subject (For /learn pages)
-                  </label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Learning Subject (Optional)</label>
                   <select
                     value={resFormSubject}
                     onChange={(e) => setResFormSubject(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
                     <option value="">None (Domain only)</option>
                     {subjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.number} · {s.title}
+                        {s.title}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Resource Category *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Category</label>
                   <select
                     value={resFormCategory}
-                    onChange={(e) => setResFormCategory(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    onChange={(e) => setResFormCategory(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
-                    <option value="Walkthrough">Walkthrough</option>
-                    <option value="Tool">Tool</option>
-                    <option value="Cheat Sheet">Cheat Sheet</option>
                     <option value="Documentation">Documentation</option>
-                    <option value="Research Paper">Research Paper</option>
-                    <option value="Video">Video</option>
-                    <option value="Website">Website</option>
-                    <option value="Downloadable">Downloadable</option>
+                    <option value="Cheat Sheet">Cheat Sheet</option>
+                    <option value="Tool">Tool</option>
+                    <option value="Walkthrough">Walkthrough</option>
+                    <option value="Paper">Research Paper</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Difficulty Level *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Difficulty</label>
                   <select
                     value={resFormDifficulty}
-                    onChange={(e) => setResFormDifficulty(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    onChange={(e) => setResFormDifficulty(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
                     <option value="Beginner">Beginner</option>
                     <option value="Intermediate">Intermediate</option>
@@ -2432,73 +2102,65 @@ export default function AdminPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">
-                    External URL or Attachment Link *
-                  </label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">URL / Link *</label>
                   <input
-                    type="text"
+                    type="url"
                     required
                     value={resFormUrl}
                     onChange={(e) => setResFormUrl(e.target.value)}
-                    placeholder="https://example.com/guide or /uploads/cheatsheet.pdf"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
+                    placeholder="https://example.com/guide or /uploads/..."
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
-                  <span className="text-[10px] text-[#8A8592] block mt-1">
-                    Tip: You can upload PDFs or diagrams in the Storage tab and paste the link here.
-                  </span>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Description / Summary</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Description *</label>
                   <textarea
-                    rows={3}
+                    rows={2}
+                    required
                     value={resFormDesc}
                     onChange={(e) => setResFormDesc(e.target.value)}
-                    placeholder="Detailed explanation of what this resource covers..."
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    placeholder="Brief description of this resource..."
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Tags (Comma-separated)</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Tags (Comma Separated)</label>
                   <input
                     type="text"
                     value={resFormTags}
                     onChange={(e) => setResFormTags(e.target.value)}
-                    placeholder="Linux, Security, Shell, Memory"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    placeholder="Forensics, RAM, Incident Response"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
+              </div>
 
-                <div className="sm:col-span-2 flex items-center gap-3 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={resFormIsPublished}
-                      onChange={(e) => setResFormIsPublished(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#151417] accent-[#151417] cursor-pointer"
-                    />
-                    <span className="font-bold text-[#151417]">
-                      Publish immediately to public website
-                    </span>
-                  </label>
-                  <span className="text-[11px] text-[#8A8592]">
-                    (Unpublished items remain visible only to admins in this portal)
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="resFormIsPublished"
+                  checked={resFormIsPublished}
+                  onChange={(e) => setResFormIsPublished(e.target.checked)}
+                  className="rounded border-[#E8D8C3] text-[#C89D3C]"
+                />
+                <label htmlFor="resFormIsPublished" className="text-xs font-semibold cursor-pointer">
+                  Publish immediately (if unchecked, resource is saved as draft)
+                </label>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-[#E8D8C3]">
                 <button
                   type="button"
                   onClick={() => setResourceModalMode(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D] hover:bg-[#F5EBDD] cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830]"
                 >
                   {resourceModalMode === 'add' ? 'Create Resource' : 'Save Changes'}
                 </button>
@@ -2515,11 +2177,8 @@ export default function AdminPage() {
             <div className="flex items-center justify-between border-b border-[#E8D8C3] pb-4">
               <div>
                 <h3 className="text-lg sm:text-xl font-black text-[#151417]">
-                  {certModalMode === 'add' ? 'Add Certification Track' : 'Edit Certification'}
+                  {certModalMode === 'add' ? 'Add New Certification' : 'Edit Certification Record'}
                 </h3>
-                <p className="text-xs text-[#645E6D]">
-                  Manage mapped professional credentials displayed on /certifications.
-                </p>
               </div>
               <button
                 onClick={() => setCertModalMode(null)}
@@ -2536,53 +2195,53 @@ export default function AdminPage() {
               </div>
             )}
 
-            <form onSubmit={handleSaveCertification} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveCert} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Credential Name *</label>
+                <div>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Certification Name *</label>
                   <input
                     type="text"
                     required
                     value={certFormName}
                     onChange={(e) => setCertFormName(e.target.value)}
-                    placeholder="e.g. CompTIA Security+ (SY0-701)"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
+                    placeholder="e.g. Certified Information Systems Security Professional"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Issuing Body / Provider *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Provider / Vendor *</label>
                   <input
                     type="text"
                     required
                     value={certFormProvider}
                     onChange={(e) => setCertFormProvider(e.target.value)}
-                    placeholder="e.g. CompTIA, OffSec, AWS, ISC2"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    placeholder="e.g. (ISC)², CompTIA, Offensive Security"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Associated Domain *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Domain</label>
                   <select
                     value={certFormDomain}
                     onChange={(e) => setCertFormDomain(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
                     {domainsList.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.number} · {d.name}
+                        {d.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Target Capability Level *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Level</label>
                   <select
                     value={certFormLevel}
-                    onChange={(e) => setCertFormLevel(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    onChange={(e) => setCertFormLevel(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
                     <option value="Beginner">Beginner</option>
                     <option value="Intermediate">Intermediate</option>
@@ -2590,64 +2249,16 @@ export default function AdminPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Exam Cost / Pricing</label>
-                  <select
-                    value={certFormCost}
-                    onChange={(e) => setCertFormCost(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
-                  >
-                    <option value="Paid">Paid</option>
-                    <option value="Free">Free</option>
-                    <option value="Student Discount">Student Discount</option>
-                  </select>
-                </div>
-
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Official Syllabus URL</label>
-                  <input
-                    type="text"
-                    value={certFormUrl}
-                    onChange={(e) => setCertFormUrl(e.target.value)}
-                    placeholder="https://www.comptia.org/certifications/security"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Description & Focus</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Description *</label>
                   <textarea
-                    rows={3}
+                    rows={2}
+                    required
                     value={certFormDesc}
                     onChange={(e) => setCertFormDesc(e.target.value)}
-                    placeholder="Summary of exam blueprint, target roles, and preparation pathway..."
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    placeholder="Overview of credential requirements..."
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Tags (Comma-separated)</label>
-                  <input
-                    type="text"
-                    value={certFormTags}
-                    onChange={(e) => setCertFormTags(e.target.value)}
-                    placeholder="Security+, CompTIA, Entry Level"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2 flex items-center gap-3 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={certFormIsPublished}
-                      onChange={(e) => setCertFormIsPublished(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#151417] accent-[#151417] cursor-pointer"
-                    />
-                    <span className="font-bold text-[#151417]">
-                      Publish immediately to public website
-                    </span>
-                  </label>
                 </div>
               </div>
 
@@ -2655,15 +2266,15 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setCertModalMode(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D] hover:bg-[#F5EBDD] cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830]"
                 >
-                  {certModalMode === 'add' ? 'Create Certification' : 'Save Changes'}
+                  {certModalMode === 'add' ? 'Create Credential' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -2678,11 +2289,8 @@ export default function AdminPage() {
             <div className="flex items-center justify-between border-b border-[#E8D8C3] pb-4">
               <div>
                 <h3 className="text-lg sm:text-xl font-black text-[#151417]">
-                  {projModalMode === 'add' ? 'Add Member Project' : 'Edit Project Details'}
+                  {projModalMode === 'add' ? 'Add New Project' : 'Edit Project Record'}
                 </h3>
-                <p className="text-xs text-[#645E6D]">
-                  Showcase member-authored toolchains and research codebases on /projects.
-                </p>
               </div>
               <button
                 onClick={() => setProjModalMode(null)}
@@ -2702,137 +2310,66 @@ export default function AdminPage() {
             <form onSubmit={handleSaveProject} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Project Name / Title *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Project Title *</label>
                   <input
                     type="text"
                     required
                     value={projFormTitle}
                     onChange={(e) => setProjFormTitle(e.target.value)}
-                    placeholder="e.g. Memory Forensic Analyzer (MFA-Core)"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
+                    placeholder="e.g. Memory Forensics Parser CLI"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Primary Domain *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Domain</label>
                   <select
                     value={projFormDomain}
                     onChange={(e) => setProjFormDomain(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
                     {domainsList.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.number} · {d.name}
+                        {d.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Lifecycle Status *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Status</label>
                   <select
                     value={projFormStatus}
-                    onChange={(e) => setProjFormStatus(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    onChange={(e) => setProjFormStatus(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   >
-                    <option value="Active">Active Lab</option>
-                    <option value="In Research">In Research</option>
-                    <option value="Production Ready">Production Ready</option>
+                    <option value="Active">Active</option>
                     <option value="Completed">Completed</option>
+                    <option value="In Progress">In Progress</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Difficulty Level *</label>
-                  <select
-                    value={projFormDifficulty}
-                    onChange={(e) => setProjFormDifficulty(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
-                  >
-                    <option value="Beginner">Beginner</option>
-                    <option value="Intermediate">Intermediate</option>
-                    <option value="Advanced">Advanced</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">GitHub Star Count</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={projFormStars}
-                    onChange={(e) => setProjFormStars(Number(e.target.value))}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
-                  />
-                </div>
-
-                <div>
+                <div className="sm:col-span-2">
                   <label className="font-bold text-[#8C6B1B] block mb-1">GitHub Repository URL</label>
                   <input
-                    type="text"
+                    type="url"
                     value={projFormGithub}
                     onChange={(e) => setProjFormGithub(e.target.value)}
-                    placeholder="https://github.com/oxnull/project-repo"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Live Demo / Dashboard URL</label>
-                  <input
-                    type="text"
-                    value={projFormDemo}
-                    onChange={(e) => setProjFormDemo(e.target.value)}
-                    placeholder="https://demo.oxnull.club"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none focus:border-[#C89D3C]"
+                    placeholder="https://github.com/..."
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Thumbnail / Diagram URL</label>
-                  <input
-                    type="text"
-                    value={projFormThumbnail}
-                    onChange={(e) => setProjFormThumbnail(e.target.value)}
-                    placeholder="/uploads/diagram.png or storage URL"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Description & Engineering Output</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Description *</label>
                   <textarea
-                    rows={3}
+                    rows={2}
+                    required
                     value={projFormDesc}
                     onChange={(e) => setProjFormDesc(e.target.value)}
-                    placeholder="Technical overview of what this project does and problems it solves..."
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
+                    placeholder="Overview of the repository and tooling..."
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Technologies (Comma-separated)</label>
-                  <input
-                    type="text"
-                    value={projFormTags}
-                    onChange={(e) => setProjFormTags(e.target.value)}
-                    placeholder="Python, C++, Volatility, Scapy, Docker"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] outline-none"
-                  />
-                </div>
-
-                <div className="sm:col-span-2 flex items-center gap-3 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={projFormIsPublished}
-                      onChange={(e) => setProjFormIsPublished(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#151417] accent-[#151417] cursor-pointer"
-                    />
-                    <span className="font-bold text-[#151417]">
-                      Publish immediately to public website
-                    </span>
-                  </label>
                 </div>
               </div>
 
@@ -2840,13 +2377,13 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setProjModalMode(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D] hover:bg-[#F5EBDD] cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#645E6D]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830] transition-colors cursor-pointer"
+                  className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830]"
                 >
                   {projModalMode === 'add' ? 'Create Project' : 'Save Changes'}
                 </button>
@@ -2856,18 +2393,15 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* SUBJECT EDIT MODAL */}
+      {/* LEARNING SUBJECT EDIT MODAL */}
       {subjectEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
           <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37] max-w-2xl w-full bg-white space-y-6 my-8 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#E8D8C3] pb-4">
               <div>
-                <h3 className="text-lg sm:text-xl font-black text-[#151417]">
+                <h3 className="text-xl font-black text-[#151417]">
                   Edit Learning Subject: {subjectEditModal.title}
                 </h3>
-                <p className="text-xs text-[#645E6D]">
-                  Updates will immediately reflect on /learn and /learn/{subjectEditModal.slug}.
-                </p>
               </div>
               <button
                 onClick={() => setSubjectEditModal(null)}
@@ -2878,27 +2412,18 @@ export default function AdminPage() {
             </div>
 
             {subFormError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
-                {subFormError}
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{subFormError}</span>
               </div>
             )}
 
             <form onSubmit={handleSaveSubject} className="space-y-4 text-xs">
               <div>
-                <label className="font-bold text-[#8C6B1B] block mb-1">Subject Title *</label>
+                <label className="font-bold text-[#8C6B1B] block mb-1">Subtitle</label>
                 <input
                   type="text"
                   required
-                  value={subFormTitle}
-                  onChange={(e) => setSubFormTitle(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-[#8C6B1B] block mb-1">Subtitle / Core Focus</label>
-                <input
-                  type="text"
                   value={subFormSubtitle}
                   onChange={(e) => setSubFormSubtitle(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
@@ -2908,7 +2433,8 @@ export default function AdminPage() {
               <div>
                 <label className="font-bold text-[#8C6B1B] block mb-1">Description</label>
                 <textarea
-                  rows={3}
+                  rows={2}
+                  required
                   value={subFormDesc}
                   onChange={(e) => setSubFormDesc(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
@@ -2916,21 +2442,21 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="font-bold text-[#8C6B1B] block mb-1">
-                  Key Concepts (One per line)
-                </label>
+                <label className="font-bold text-[#8C6B1B] block mb-1">Key Concepts (One per line)</label>
                 <textarea
                   rows={4}
+                  required
                   value={subFormKeyConcepts}
                   onChange={(e) => setSubFormKeyConcepts(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] font-mono text-xs"
+                  className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-[#8C6B1B] block mb-1">Hands-On Lab Challenge</label>
+                <label className="font-bold text-[#8C6B1B] block mb-1">Hands-on Lab Exercise</label>
                 <textarea
-                  rows={3}
+                  rows={2}
+                  required
                   value={subFormLab}
                   onChange={(e) => setSubFormLab(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
@@ -2957,18 +2483,15 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* DOMAIN EDIT MODAL */}
+      {/* DOMAIN METADATA EDIT MODAL */}
       {domainEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
           <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37] max-w-2xl w-full bg-white space-y-6 my-8 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#E8D8C3] pb-4">
               <div>
-                <h3 className="text-lg sm:text-xl font-black text-[#151417]">
+                <h3 className="text-xl font-black text-[#151417]">
                   Edit Domain: {domainEditModal.name}
                 </h3>
-                <p className="text-xs text-[#645E6D]">
-                  Updates will immediately reflect on homepage, /domains, and /domains/{domainEditModal.slug}.
-                </p>
               </div>
               <button
                 onClick={() => setDomainEditModal(null)}
@@ -2979,15 +2502,16 @@ export default function AdminPage() {
             </div>
 
             {domFormError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
-                {domFormError}
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{domFormError}</span>
               </div>
             )}
 
             <form onSubmit={handleSaveDomain} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Domain Name *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Domain Name</label>
                   <input
                     type="text"
                     required
@@ -2998,7 +2522,7 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Badge Tag *</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Badge Subtitle</label>
                   <input
                     type="text"
                     required
@@ -3010,8 +2534,9 @@ export default function AdminPage() {
 
                 <div className="sm:col-span-2">
                   <label className="font-bold text-[#8C6B1B] block mb-1">Tagline</label>
-                  <textarea
-                    rows={2}
+                  <input
+                    type="text"
+                    required
                     value={domFormTagline}
                     onChange={(e) => setDomFormTagline(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
@@ -3019,9 +2544,10 @@ export default function AdminPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Overview & Methodology</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Overview Description</label>
                   <textarea
-                    rows={4}
+                    rows={3}
+                    required
                     value={domFormOverview}
                     onChange={(e) => setDomFormOverview(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
@@ -3029,12 +2555,12 @@ export default function AdminPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Focus Areas (One per line)</label>
-                  <textarea
-                    rows={4}
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Focus Areas (Comma separated)</label>
+                  <input
+                    type="text"
                     value={domFormFocusAreas}
                     onChange={(e) => setDomFormFocusAreas(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2] font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
               </div>
@@ -3059,18 +2585,13 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ACTIVITY ADD / EDIT MODAL */}
+      {/* ACTIVITY ADD MODAL */}
       {activityModalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
           <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37] max-w-2xl w-full bg-white space-y-6 my-8 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#E8D8C3] pb-4">
               <div>
-                <h3 className="text-lg sm:text-xl font-black text-[#151417]">
-                  {activityModalMode === 'add' ? 'Add Tactical Activity' : 'Edit Activity'}
-                </h3>
-                <p className="text-xs text-[#645E6D]">
-                  Manage workshops, CTF drills, and lab sessions on /activities.
-                </p>
+                <h3 className="text-xl font-black text-[#151417]">Create Club Activity</h3>
               </div>
               <button
                 onClick={() => setActivityModalMode(null)}
@@ -3081,71 +2602,34 @@ export default function AdminPage() {
             </div>
 
             {actFormError && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
-                {actFormError}
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{actFormError}</span>
               </div>
             )}
 
             <form onSubmit={handleSaveActivity} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
+                <div>
                   <label className="font-bold text-[#8C6B1B] block mb-1">Activity Title *</label>
                   <input
                     type="text"
                     required
                     value={actFormTitle}
                     onChange={(e) => setActFormTitle(e.target.value)}
-                    placeholder="e.g. Memory Forensic Triage Lab"
+                    placeholder="e.g. Memory Forensics Lab"
                     className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Subtitle / Format</label>
+                  <label className="font-bold text-[#8C6B1B] block mb-1">Cadence / Frequency</label>
                   <input
                     type="text"
-                    value={actFormSubtitle}
-                    onChange={(e) => setActFormSubtitle(e.target.value)}
-                    placeholder="e.g. Hands-on CTF Scrimmage"
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Category Type *</label>
-                  <select
-                    value={actFormType}
-                    onChange={(e) => setActFormType(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                  >
-                    <option value="Technical">Technical</option>
-                    <option value="Non-Technical">Non-Technical</option>
-                    <option value="Community">Community</option>
-                    <option value="Career">Career</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Frequency</label>
-                  <select
+                    required
                     value={actFormFrequency}
                     onChange={(e) => setActFormFrequency(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
-                  >
-                    <option value="Weekly">Weekly</option>
-                    <option value="Bi-Weekly">Bi-Weekly</option>
-                    <option value="Monthly">Monthly</option>
-                    <option value="Per Semester">Per Semester</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-[#8C6B1B] block mb-1">Target Participants</label>
-                  <input
-                    type="text"
-                    value={actFormParticipants}
-                    onChange={(e) => setActFormParticipants(e.target.value)}
-                    placeholder="All Members or Advanced Working Guild"
+                    placeholder="e.g. Weekly on Fridays"
                     className="w-full p-2.5 rounded-xl border border-[#E8D8C3] bg-[#FAF7F2]"
                   />
                 </div>
@@ -3175,7 +2659,7 @@ export default function AdminPage() {
                   type="submit"
                   className="px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#151417] text-white hover:bg-[#2A2830]"
                 >
-                  {activityModalMode === 'add' ? 'Create Activity' : 'Save Changes'}
+                  Create Activity
                 </button>
               </div>
             </form>
@@ -3186,7 +2670,7 @@ export default function AdminPage() {
       {/* DELETE CONFIRMATION MODAL */}
       {deleteConfirmation && deleteConfirmation.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="glass-card rounded-3xl p-6 sm:p-8 border-rose-300 max-w-md w-full bg-white space-y-5 shadow-2xl">
+          <div className="glass-card rounded-3xl p-6 sm:p-8 border-rose-300 max-w-md w-full bg-white space-y-5 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>

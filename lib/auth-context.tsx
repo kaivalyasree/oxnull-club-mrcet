@@ -19,13 +19,16 @@ interface AuthContextType {
   isLoading: boolean;
   loginWithGoogle: () => Promise<void>;
   loginWithCredentials: (email: string, name?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  switchAccount: () => Promise<void>;
   toggleSaveResource: (id: string) => Promise<void>;
   toggleCompleteResource: (id: string) => Promise<void>;
   toggleTrackCertification: (id: string) => Promise<void>;
   toggleEnrollDomain: (id: string) => Promise<void>;
   toggleRsvpActivity: (id: string) => Promise<void>;
   toggleCompleteFoundation: (id: string) => Promise<void>;
+  toggleCompleteExploreTask: (taskId: string) => Promise<void>;
+  saveExploreTaskSubmission: (taskId: string, submission: string, status?: 'not_started' | 'in_progress' | 'completed') => Promise<void>;
   updateUserNotes: (notes: string) => Promise<void>;
 }
 
@@ -38,6 +41,8 @@ const defaultProgress: UserProgressData = {
   activeProjectIds: [],
   rsvpdActivityIds: [],
   completedFoundationIds: [],
+  completedExploreTaskIds: [],
+  exploreTaskSubmissions: {},
   notes: ''
 };
 
@@ -111,6 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProgress(defaultProgress);
       return;
     }
+    // Prevent stale progress from previously authenticated student
+    setProgress(defaultProgress);
     fetch(`/api/user-progress?userId=${encodeURIComponent(user.id)}`)
       .then((res) => res.json())
       .then((data) => {
@@ -159,9 +166,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const cleanEmail = email.trim().toLowerCase();
     const resolvedName = name?.trim() || cleanEmail.split('@')[0];
+    const safeId = 'usr-' + cleanEmail.replace(/[^a-z0-9]/g, '_');
 
     const newUser: User = {
-      id: `usr-${Date.now()}`,
+      id: safeId,
       name: resolvedName,
       email: cleanEmail,
       role: 'student',
@@ -175,11 +183,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     if (isSupabaseConfigured) {
-      await sbSignOut();
+      try {
+        await sbSignOut();
+      } catch (err) {
+        console.error('Supabase sign-out error:', err);
+      }
     }
     setUser(null);
     setProgress(defaultProgress);
     localStorage.removeItem('0xnull_user');
+  };
+
+  const switchAccount = async () => {
+    await logout();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login?switch=true&returnUrl=/dashboard';
+    }
   };
 
   const toggleSaveResource = async (id: string) => {
@@ -224,6 +243,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await saveProgressToApi({ completedFoundationIds: list });
   };
 
+  const toggleCompleteExploreTask = async (taskId: string) => {
+    const currentList = progress.completedExploreTaskIds || [];
+    const list = currentList.includes(taskId)
+      ? currentList.filter((item) => item !== taskId)
+      : [...currentList, taskId];
+    await saveProgressToApi({ completedExploreTaskIds: list });
+  };
+
+  const saveExploreTaskSubmission = async (
+    taskId: string,
+    submission: string,
+    status: 'not_started' | 'in_progress' | 'completed' = 'completed'
+  ) => {
+    const currentSubmissions = progress.exploreTaskSubmissions || {};
+    const nextSubmissions = {
+      ...currentSubmissions,
+      [taskId]: {
+        status,
+        submission,
+        updatedAt: new Date().toISOString()
+      }
+    };
+    const currentCompleted = progress.completedExploreTaskIds || [];
+    const nextCompleted =
+      status === 'completed'
+        ? Array.from(new Set([...currentCompleted, taskId]))
+        : currentCompleted.filter((id) => id !== taskId);
+
+    await saveProgressToApi({
+      exploreTaskSubmissions: nextSubmissions,
+      completedExploreTaskIds: nextCompleted
+    });
+  };
+
   const updateUserNotes = async (notes: string) => {
     await saveProgressToApi({ notes });
   };
@@ -237,12 +290,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithGoogle,
         loginWithCredentials,
         logout,
+        switchAccount,
         toggleSaveResource,
         toggleCompleteResource,
         toggleTrackCertification,
         toggleEnrollDomain,
         toggleRsvpActivity,
         toggleCompleteFoundation,
+        toggleCompleteExploreTask,
+        saveExploreTaskSubmission,
         updateUserNotes
       }}
     >

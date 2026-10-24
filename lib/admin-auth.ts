@@ -13,25 +13,28 @@ export interface AdminSessionPayload {
  * Retrieves the configured administrator username from server-only environment.
  */
 export function getAdminUsername(): string {
-  return process.env.ADMIN_USERNAME?.trim() || '';
+  const raw = process.env.ADMIN_USERNAME?.trim() || '';
+  return raw.replace(/^["']|["']$/g, '');
 }
 
 /**
  * Retrieves the configured bcrypt password hash from server-only environment.
  */
 export function getAdminPasswordHash(): string {
-  return process.env.ADMIN_PASSWORD_HASH?.trim() || '';
+  const raw = process.env.ADMIN_PASSWORD_HASH?.trim() || '';
+  return raw.replace(/^["']|["']$/g, '');
 }
 
 /**
  * Retrieves the secret used for signing administrator sessions.
  */
 export function getSessionSecret(): string {
-  return (
+  const raw = (
     process.env.ADMIN_SESSION_SECRET?.trim() ||
     process.env.SESSION_SECRET?.trim() ||
     ''
   );
+  return raw.replace(/^["']|["']$/g, '');
 }
 
 /**

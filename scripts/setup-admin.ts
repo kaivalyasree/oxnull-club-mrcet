@@ -122,7 +122,8 @@ async function main() {
 
   envLines.push(`# 0XNULL Administrator Authentication (Server-Only)`);
   envLines.push(`ADMIN_USERNAME="${username}"`);
-  envLines.push(`ADMIN_PASSWORD_HASH="${passwordHash}"`);
+  const escapedHash = passwordHash.replace(/\$/g, '\\$');
+  envLines.push(`ADMIN_PASSWORD_HASH="${escapedHash}"`);
   envLines.push(`ADMIN_SESSION_SECRET="${sessionSecret}"`);
 
   fs.writeFileSync(envLocalPath, envLines.join('\n') + '\n', 'utf-8');

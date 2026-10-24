@@ -115,7 +115,7 @@ export default function ResourcesPage() {
               className="px-2.5 py-1 rounded-xl bg-white border border-[#E8D8C3] text-xs text-[#151417] outline-none font-medium"
             >
               <option value="all">All Domains</option>
-              {DOMAINS.map((d) => (
+              {DOMAINS.filter((d) => d.slug !== 'awareness' && d.slug !== 'explore').map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.number} · {d.name}
                 </option>

@@ -234,7 +234,7 @@ export default function HeroSection() {
             {/* PRIMARY JOIN THE CLUB BUTTON */}
             <div className="pt-7 sm:pt-8">
               <Link
-                href="/join"
+                href="/domains"
                 className="inline-flex items-center gap-3 px-8 py-3.5 rounded-full text-xs sm:text-sm font-bold tracking-wider uppercase bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#C89D3C] transition-all duration-300 shadow-md hover:shadow-xl hover:scale-[1.03] border border-[#D4AF37]/40 group cursor-pointer"
               >
                 <span>Join the Club</span>

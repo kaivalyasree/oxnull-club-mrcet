@@ -1,3 +1,19 @@
+export interface DomainTrack {
+  id: string;
+  name: string;
+  title?: string;
+  description: string;
+  domainId: string;
+  domainSlug: string;
+  topics?: string[];
+  competencies?: string[];
+  deliverable?: string;
+  deliverables?: string[];
+  level?: string;
+  durationWeeks?: number;
+  isActive?: boolean;
+}
+
 export interface Domain {
   id: string;
   slug: string;
@@ -7,6 +23,7 @@ export interface Domain {
   badge: string;
   overview: string;
   focusAreas: string[];
+  tracks?: DomainTrack[];
   subTracks?: {
     name: string;
     description: string;
@@ -168,6 +185,38 @@ export const DOMAINS: Domain[] = [
       'Digital privacy, consumer data rights, and surveillance technologies',
       'Emerging attack vectors (voice clones, deepfakes, QR code phishing)'
     ],
+    tracks: [
+      {
+        id: 'track-awareness-intel',
+        name: 'Threat Intelligence & Campaign Dissection',
+        description: 'Tracking global threat actors, deconstructing ransomware payloads, analyzing MITRE ATT&CK techniques, and authoring threat memos.',
+        domainId: 'd6',
+        domainSlug: 'awareness',
+        topics: ['Threat intelligence feeds', 'MITRE ATT&CK mapping', 'Malware IoCs', 'Ransomware economics'],
+        deliverable: 'Author an operational intelligence briefing dissecting an ongoing cyber campaign.',
+        isActive: true
+      },
+      {
+        id: 'track-awareness-social-eng',
+        name: 'Social Engineering & Phishing Analysis',
+        description: 'Inspecting deceptive email headers (SPF, DKIM, DMARC), behavioral psychology, cognitive biases, and credential harvesting kits.',
+        domainId: 'd6',
+        domainSlug: 'awareness',
+        topics: ['Email header forensics', 'Spear-phishing lures', 'Business Email Compromise (BEC)', 'Behavioral nudges'],
+        deliverable: 'Publish an interactive scam detection and deceptive URL verification guide.',
+        isActive: true
+      },
+      {
+        id: 'track-awareness-privacy',
+        name: 'Digital Privacy & Surveillance Defense',
+        description: 'Auditing consumer data trails, browser telemetry, mobile permissions, and personal operational security (OPSEC).',
+        domainId: 'd6',
+        domainSlug: 'awareness',
+        topics: ['Digital footprint auditing', 'Hardware MFA keys', 'Data privacy compliance', 'Surveillance tracking'],
+        deliverable: 'Deliver a comprehensive digital privacy audit checklist and hardened baseline.',
+        isActive: true
+      }
+    ],
     activities: [
       'Weekly News Briefings (Recurring intelligence roundups on zero-days and active campaigns)',
       'Awareness Campaigns (Public-facing university drives and scam prevention workshops)',
@@ -209,6 +258,48 @@ export const DOMAINS: Domain[] = [
       'Leadership, teamwork, & large-scale event operations',
       'Public relations, community networking, & industry outreach',
       'Interdisciplinary collaboration between technical and non-technical students'
+    ],
+    tracks: [
+      {
+        id: 'track-explore-comm',
+        name: 'Technical Storytelling & Security Writing',
+        description: 'Translating complex binary vulnerabilities, exploits, and technical whitepapers into compelling narratives and executive summaries.',
+        domainId: 'd7',
+        domainSlug: 'explore',
+        topics: ['Executive risk reporting', 'CVE explainer writing', 'Technical blogging', 'Visual infographic design'],
+        deliverable: 'Publish a peer-reviewed explainer translating a zero-day exploit for a non-technical audience.',
+        isActive: true
+      },
+      {
+        id: 'track-explore-speaking',
+        name: 'Public Speaking & Keynote Presentations',
+        description: 'Developing stage presence, conference presentation design, live technical demonstrations, and workshop facilitation.',
+        domainId: 'd7',
+        domainSlug: 'explore',
+        topics: ['Slide deck architecture', 'Stage presence & voice projection', 'Live demo handling', 'Audience engagement'],
+        deliverable: 'Deliver a solo 20-minute lightning talk at a general meeting or symposium.',
+        isActive: true
+      },
+      {
+        id: 'track-explore-events',
+        name: 'Teamwork & Security Event Operations',
+        description: 'Planning, producing, and managing large-scale collegiate CTFs, hackathons, guest speaker seminars, and campus workshops.',
+        domainId: 'd7',
+        domainSlug: 'explore',
+        topics: ['CTF infrastructure setup', 'Event logistics & scheduling', 'Sponsorship outreach', 'Volunteer team leadership'],
+        deliverable: 'Co-direct the operational planning for a campus-wide 0XNULL technical scrimmage.',
+        isActive: true
+      },
+      {
+        id: 'track-explore-outreach',
+        name: 'PR, Community & Industry Relations',
+        description: 'Building industry mentorship bridges, liaising with cybersecurity employers, managing club publications, and alumni relations.',
+        domainId: 'd7',
+        domainSlug: 'explore',
+        topics: ['Industry partner networking', 'Alumni panel curation', 'Social media dissemination', 'Community engagement'],
+        deliverable: 'Facilitate an industry practitioner fireside chat session for club members.',
+        isActive: true
+      }
     ],
     appliedAreas: [
       { code: 'SKILL-1', title: 'Communication & Storytelling', description: 'Translating complex CVEs and binary exploits into clear executive narratives.' },
@@ -262,6 +353,28 @@ export const DOMAINS: Domain[] = [
       'SIEM configuration & log analysis (Splunk, Elastic)',
       'Threat detection rules (YARA, Sigma)',
       'Incident response triage & forensic stabilization'
+    ],
+    tracks: [
+      {
+        id: 'track-red-team',
+        name: 'Red Team (Offensive Practice)',
+        description: 'Thinking from the attacker position — finding architectural and implementation weaknesses before threat actors exploit them.',
+        domainId: 'd1',
+        domainSlug: 'red-blue-team',
+        topics: ['Ethical hacking fundamentals', 'Vulnerability assessment', 'Web application pentesting', 'Controlled attack simulation'],
+        deliverable: 'Scoped penetration testing lab report and exploit reproduction memo.',
+        isActive: true
+      },
+      {
+        id: 'track-blue-team',
+        name: 'Blue Team (Defensive Operations)',
+        description: 'Watching, detecting, responding — building the organizational muscle that shields mission-critical systems.',
+        domainId: 'd1',
+        domainSlug: 'red-blue-team',
+        topics: ['Security monitoring & telemetry', 'SIEM & log pipelines', 'Sigma/YARA detection rules', 'Incident response triage'],
+        deliverable: 'Deploy custom Sigma rules and complete an adversarial containment lab.',
+        isActive: true
+      }
     ],
     subTracks: [
       {
@@ -333,6 +446,38 @@ export const DOMAINS: Domain[] = [
       'Memory forensics & volatile payload extraction',
       'Log correlation & timeline triage synthesis'
     ],
+    tracks: [
+      {
+        id: 'track-forensics-disk',
+        name: 'Disk & Filesystem Forensics',
+        description: 'RAW/E01 image carving, NTFS $MFT analysis, timeline reconstruction, deleted file recovery, and legal chain of custody.',
+        domainId: 'd2',
+        domainSlug: 'digital-forensics',
+        topics: ['Autopsy investigation', 'Filesystem structures ($MFT, EXT4)', 'File signature carving', 'Evidence integrity hashing'],
+        deliverable: 'Complete a cryptographic disk image integrity verification and artefact extraction report.',
+        isActive: true
+      },
+      {
+        id: 'track-forensics-network',
+        name: 'Network Traffic & Protocol Forensics',
+        description: 'Capturing, filtering, and dissecting PCAP captures to reconstruct covert exfiltration channels, C2 beacons, and protocol anomalies.',
+        domainId: 'd2',
+        domainSlug: 'digital-forensics',
+        topics: ['Wireshark protocol filters', 'DNS tunneling detection', 'TLS session inspection', 'Covert channel analysis'],
+        deliverable: 'Deliver an incident timeline report detailing a simulated data-exfiltration breach from PCAPs.',
+        isActive: true
+      },
+      {
+        id: 'track-forensics-memory',
+        name: 'Volatile Memory & Malware Forensics',
+        description: 'Dumping volatile RAM, extracting process trees, identifying injected DLLs, unhooking functions, and isolating rootkits using Volatility 3.',
+        domainId: 'd2',
+        domainSlug: 'digital-forensics',
+        topics: ['Volatility 3 analysis', 'Process memory carving', 'DLL injection detection', 'Kernel rootkit discovery'],
+        deliverable: 'Author a forensic case walkthrough identifying a fileless malware sample from memory dump.',
+        isActive: true
+      }
+    ],
     toolsCovered: [
       {
         name: 'Wireshark',
@@ -390,6 +535,48 @@ export const DOMAINS: Domain[] = [
       'Cryptographic hashing (SHA-2, SHA-3, BLAKE3, collision resistance)',
       'Key management, exchange protocols (Diffie-Hellman), and HSM architectures',
       'Cryptanalysis, padding oracle attacks, and side-channel vulnerabilities'
+    ],
+    tracks: [
+      {
+        id: 'track-crypto-protocols',
+        name: 'HTTPS & Secure Protocol Engineering',
+        description: 'TLS 1.3 handshake mechanics, cipher suite negotiation, PKI trust chains, forward secrecy, and certificate revocation.',
+        domainId: 'd3',
+        domainSlug: 'cryptography',
+        topics: ['TLS 1.3 architecture', 'X.509 certificate chains', 'Forward secrecy guarantees', 'Private Certificate Authority'],
+        deliverable: 'Deploy and test a private Certificate Authority issuing client TLS certificates.',
+        isActive: true
+      },
+      {
+        id: 'track-crypto-auth',
+        name: 'Authentication & Public Key Systems',
+        description: 'FIDO2/WebAuthn public-key authentication, TOTP/HOTP protocols, JSON Web Signatures (JWS), and zero-knowledge primitives.',
+        domainId: 'd3',
+        domainSlug: 'cryptography',
+        topics: ['WebAuthn / FIDO2', 'TOTP algorithm RFC 6238', 'Digital signatures', 'Key derivation functions (Argon2, PBKDF2)'],
+        deliverable: 'Implement a zero-dependency passwordless authentication flow using public-key credentials.',
+        isActive: true
+      },
+      {
+        id: 'track-crypto-primitives',
+        name: 'Applied Symmetric & Asymmetric Primitives',
+        description: 'AES-GCM block cipher modes, ChaCha20-Poly1305, RSA modular arithmetic, ECC curves (Ed25519), and hardware KMS integration.',
+        domainId: 'd3',
+        domainSlug: 'cryptography',
+        topics: ['AES-GCM & AEAD modes', 'Elliptic Curve Cryptography', 'Envelope encryption patterns', 'KMS key rotation'],
+        deliverable: 'Build a secure envelope encryption utility with authenticated data verification.',
+        isActive: true
+      },
+      {
+        id: 'track-crypto-analysis',
+        name: 'Cryptanalysis & Post-Quantum Algorithms',
+        description: 'Padding oracle attacks, length extension vulnerabilities, weak PRNG exploitation, and NIST post-quantum standards (Kyber/Dilithium).',
+        domainId: 'd3',
+        domainSlug: 'cryptography',
+        topics: ['Padding oracle exploitation', 'Timing side-channel leaks', 'Lattice-based cryptography', 'Post-quantum readiness'],
+        deliverable: 'Publish a technical breakdown solving cryptanalytic CTF challenges.',
+        isActive: true
+      }
     ],
     appliedAreas: [
       {
@@ -458,6 +645,48 @@ export const DOMAINS: Domain[] = [
       'Container security (Docker image hardening, runtime isolation, Kubernetes RBAC)',
       'Compliance posture (CIS benchmarks, automated audits, Infrastructure as Code scanning)'
     ],
+    tracks: [
+      {
+        id: 'track-cloud-iam',
+        name: 'Cloud Architecture & IAM Governance',
+        description: 'Least-privilege policy engineering, ABAC/RBAC, cross-account trust delegation, session policies, and privilege escalation auditing.',
+        domainId: 'd4',
+        domainSlug: 'cloud-security',
+        topics: ['AWS IAM policy evaluation', 'Permission boundaries', 'Role chaining & trust models', 'IAM Access Analyzer'],
+        deliverable: 'Audit and harden a multi-account cloud environment with zero wildcard (*) permissions.',
+        isActive: true
+      },
+      {
+        id: 'track-cloud-network',
+        name: 'Cloud Networking & Perimeter Security',
+        description: 'VPC design, private subnets, security group rules, transit gateways, VPC flow logs, and egress proxy filtering.',
+        domainId: 'd4',
+        domainSlug: 'cloud-security',
+        topics: ['VPC architecture', 'Security group least privilege', 'VPC Flow Log inspection', 'Egress traffic filtering'],
+        deliverable: 'Design and deploy an isolated multi-tier cloud VPC with zero public database exposure.',
+        isActive: true
+      },
+      {
+        id: 'track-cloud-k8s',
+        name: 'Container & Kubernetes Hardening',
+        description: 'Distroless container base images, rootless execution, Docker CIS benchmarks, Pod Security Standards, and Kubernetes RBAC.',
+        domainId: 'd4',
+        domainSlug: 'cloud-security',
+        topics: ['Minimal container images', 'Kubernetes RBAC', 'Pod Security Standards', 'Cluster security auditing (Kube-bench)'],
+        deliverable: 'Build a CI/CD container security scanner blocking vulnerable images prior to deployment.',
+        isActive: true
+      },
+      {
+        id: 'track-cloud-cspm',
+        name: 'Cloud Posture & Infrastructure as Code',
+        description: 'Terraform security audits, automated CIS benchmark compliance checks, CloudTrail anomaly detection, and automated remediation.',
+        domainId: 'd4',
+        domainSlug: 'cloud-security',
+        topics: ['Terraform security (tfsec/Checkov)', 'CSPM automated auditing', 'CloudTrail log correlation', 'Serverless incident containment'],
+        deliverable: 'Deploy a serverless lambda function that automatically quarantines misconfigured storage buckets.',
+        isActive: true
+      }
+    ],
     appliedAreas: [
       { code: 'CS-01', title: 'Cloud Fundamentals', description: 'Service models and boundary enforcement across shared responsibility matrices.' },
       { code: 'CS-02', title: 'Identity & Access (IAM)', description: 'Least-privilege policy engineering, ABAC, RBAC, and credential rotation.' },
@@ -513,6 +742,48 @@ export const DOMAINS: Domain[] = [
       'Risk management methodologies & technical trade-offs',
       'Resilient recovery patterns, disaster recovery, and operational fault tolerance'
     ],
+    tracks: [
+      {
+        id: 'track-arch-zerotrust',
+        name: 'Zero Trust System Design & Identity Proxies',
+        description: 'Enforcing Never Trust Always Verify principles, micro-perimeters, mutual TLS (mTLS) service meshes, and identity-aware proxies.',
+        domainId: 'd5',
+        domainSlug: 'security-architecture',
+        topics: ['Zero Trust Architecture (NIST SP 800-207)', 'Mutual TLS service mesh', 'Identity-aware proxies', 'Context-aware access'],
+        deliverable: 'Produce a complete Zero Trust architectural specification for an enterprise web platform.',
+        isActive: true
+      },
+      {
+        id: 'track-arch-threatmodel',
+        name: 'STRIDE Threat Modeling & Attack Surface Auditing',
+        description: 'Decomposing software architectures using Data Flow Diagrams (DFDs), STRIDE threat taxonomy, and trust boundary mapping.',
+        domainId: 'd5',
+        domainSlug: 'security-architecture',
+        topics: ['STRIDE categorization', 'Data flow diagramming (DFDs)', 'Trust boundary identification', 'Risk mitigation trade-offs'],
+        deliverable: 'Deliver an end-to-end STRIDE threat model report and mitigation matrix for a banking service.',
+        isActive: true
+      },
+      {
+        id: 'track-arch-defense',
+        name: 'Defense in Depth & Network Segmentation',
+        description: 'Designing multi-ring defense: Edge WAF, segmented DMZ, internal micro-segmentation, host hardening, and core data vaults.',
+        domainId: 'd5',
+        domainSlug: 'security-architecture',
+        topics: ['Micro-segmentation VLANs', 'WAF ingress rate-limiting', 'Host CIS baselines', 'Core data vaulting'],
+        deliverable: 'Design a layered defense blueprint isolating production databases across four security rings.',
+        isActive: true
+      },
+      {
+        id: 'track-arch-resilience',
+        name: 'Enterprise Resilience & Disaster Blueprinting',
+        description: 'Air-gapped immutable backup topologies, automated failover, business continuity planning, and tabletop incident drills.',
+        domainId: 'd5',
+        domainSlug: 'security-architecture',
+        topics: ['Air-gapped backup models', 'Disaster recovery runbooks', 'RTO/RPO optimization', 'Tabletop simulation execution'],
+        deliverable: 'Draft and defend an enterprise disaster recovery plan against widespread ransomware disruption.',
+        isActive: true
+      }
+    ],
     appliedAreas: [
       { code: 'RING-1', title: 'Perimeter Defense', description: 'DDoS mitigation, WAF ingress, edge TLS termination, and rate-limiting gateways.' },
       { code: 'RING-2', title: 'Network Segmentation', description: 'Micro-segmented VLANs, zero-trust overlay networks, and internal mutual TLS.' },
@@ -547,6 +818,20 @@ export const DOMAINS: Domain[] = [
     ]
   }
 ];
+
+// Helper functions for tracks
+export function getAllTracks(): DomainTrack[] {
+  return DOMAINS.flatMap((d) => d.tracks || []);
+}
+
+export function getTracksByDomainId(domainId: string): DomainTrack[] {
+  const domain = DOMAINS.find((d) => d.id === domainId || d.slug === domainId);
+  return domain?.tracks || [];
+}
+
+export function getTrackById(trackId: string): DomainTrack | undefined {
+  return getAllTracks().find((t) => t.id === trackId);
+}
 
 // Activities collection (starts with zero records per Section 7, populated via Admin/Backend)
 export const ACTIVITIES: Activity[] = [];

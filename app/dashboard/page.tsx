@@ -9,7 +9,8 @@ import {
   INITIAL_RESOURCES,
   INITIAL_CERTIFICATIONS,
   INITIAL_PROJECTS,
-  ACTIVITIES
+  ACTIVITIES,
+  getTrackById
 } from '@/lib/data';
 import ResourceCard from '@/components/ResourceCard';
 import CertificationCard from '@/components/CertificationCard';
@@ -28,15 +29,52 @@ import {
   Save,
   Sparkles,
   Compass,
-  FileText
+  FileText,
+  ArrowLeftRight,
+  LogOut,
+  Lock
 } from 'lucide-react';
 
+import { TrackEnrollment } from '@/lib/store';
+
 export default function StudentDashboardPage() {
-  const { user, progress, updateUserNotes } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'resources' | 'certifications' | 'activities' | 'notes'>('overview');
+  const { user, progress, updateUserNotes, logout, switchAccount, isLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<'overview' | 'tracks' | 'resources' | 'certifications' | 'activities' | 'notes'>('overview');
   const [notesInput, setNotesInput] = useState(progress.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Real Database Track Enrollments
+  const [trackEnrollments, setTrackEnrollments] = useState<TrackEnrollment[]>([]);
+  const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
+
+  React.useEffect(() => {
+    if (!user?.id) {
+      setTrackEnrollments([]);
+      return;
+    }
+    setIsLoadingEnrollments(true);
+    fetch(`/api/enrollments?userId=${encodeURIComponent(user.id)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setTrackEnrollments(data.data);
+        } else {
+          setTrackEnrollments([]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load student track enrollments:', err);
+        setTrackEnrollments([]);
+      })
+      .finally(() => {
+        setIsLoadingEnrollments(false);
+      });
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    setNotesInput(progress.notes || '');
+  }, [progress.notes]);
 
   // Derive user specific items
   const enrolledDomainsList = DOMAINS.filter((d) => progress.enrolledDomains.includes(d.id));
@@ -56,6 +94,56 @@ export default function StudentDashboardPage() {
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2500);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-[#151417] text-[#FAF7F2] flex items-center justify-center border border-[#D4AF37] animate-pulse">
+          <Shield className="w-6 h-6 text-[#C89D3C]" />
+        </div>
+        <p className="text-xs font-semibold text-[#645E6D]">Authenticating student session & records...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center py-12 px-4 sm:px-6">
+        <div className="w-full max-w-md glass-card rounded-3xl p-8 sm:p-10 border-[#D4AF37]/40 shadow-2xl bg-white/95 text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-[#151417] text-[#FAF7F2] flex items-center justify-center font-bold text-2xl border border-[#D4AF37] mx-auto shadow-sm">
+            <Lock className="w-8 h-8 text-[#C89D3C]" />
+          </div>
+          <div className="space-y-2">
+            <span className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase text-[#967223]">
+              Authentication Required
+            </span>
+            <h1 className="text-2xl font-black text-[#151417] tracking-tight">
+              Student Portal Access
+            </h1>
+            <p className="text-xs text-[#645E6D] leading-relaxed">
+              Please sign in to access your enrolled specialization tracks, laboratory progress, bookmarked papers, and private study notes.
+            </p>
+          </div>
+
+          <div className="pt-2 space-y-3">
+            <Link
+              href="/login?returnUrl=/dashboard"
+              className="w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors shadow-sm inline-flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <User className="w-4 h-4 text-[#E5C378]" />
+              <span>Sign In to Student Portal</span>
+            </Link>
+            <Link
+              href="/domains"
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold border border-[#E8D8C3] bg-white text-[#55505C] hover:bg-[#FAF7F2] transition-colors inline-block"
+            >
+              Browse 0XNULL Domains
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 max-w-7xl mx-auto space-y-10">
@@ -80,6 +168,26 @@ export default function StudentDashboardPage() {
             </p>
           </div>
         </div>
+
+        {/* Visible Actions: Switch Account & Logout */}
+        <div className="flex items-center gap-2.5 self-start md:self-center">
+          <button
+            onClick={() => switchAccount()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#E8D8C3] bg-white text-xs font-semibold text-[#8C6B1B] hover:bg-[#FAF7F2] hover:border-[#C89D3C] transition-all cursor-pointer shadow-xs"
+            title="Sign out and switch to another student account"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5 text-[#C89D3C]" />
+            <span>Switch Account</span>
+          </button>
+          <button
+            onClick={() => logout()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#151417] text-[#FAF7F2] hover:bg-rose-900 transition-colors text-xs font-semibold cursor-pointer shadow-xs"
+            title="Log out of current student session"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-300" />
+            <span>Log Out</span>
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards Grid */}
@@ -103,19 +211,23 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Metric 2: Enrolled Domains */}
+        {/* Metric 2: Real Track Enrollments */}
         <div className="glass-card rounded-2xl p-5 border-[#E8D8C3]">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block mb-1">
-            Enrolled Domains
+            Track Enrollments
           </span>
           <div className="flex items-baseline gap-2 mb-2">
             <span className="text-3xl font-black text-[#151417]">
-              {progress.enrolledDomains.length}
+              {trackEnrollments.length}
             </span>
-            <span className="text-xs text-[#645E6D]">of 7 tracks</span>
+            <span className="text-xs text-[#645E6D]">
+              ({trackEnrollments.filter((e) => e.status === 'approved').length} approved)
+            </span>
           </div>
           <p className="text-[11px] text-[#8C6B1B] font-medium line-clamp-1">
-            {enrolledDomainsList.map((d) => d.name).join(', ') || 'None selected yet'}
+            {trackEnrollments.length > 0
+              ? trackEnrollments.map((e) => e.trackTitle).join(', ')
+              : `${progress.enrolledDomains.length} domain bookmark(s)`}
           </p>
         </div>
 
@@ -154,6 +266,7 @@ export default function StudentDashboardPage() {
       <div className="flex items-center gap-2 border-b border-[#E8D8C3] pb-3 overflow-x-auto text-xs font-bold uppercase tracking-wider">
         {[
           { id: 'overview', label: 'Overview & Guidance', icon: Sparkles },
+          { id: 'tracks', label: `My Tracks (${trackEnrollments.length})`, icon: Shield },
           { id: 'resources', label: `Saved Resources (${savedResourcesList.length})`, icon: BookOpen },
           { id: 'certifications', label: `Certifications (${trackedCertsList.length})`, icon: Award },
           { id: 'activities', label: `My Activities (${rsvpdActivitiesList.length})`, icon: Calendar },
@@ -229,15 +342,138 @@ export default function StudentDashboardPage() {
             </div>
           </div>
 
+          {/* Active Core Track Enrollments Section */}
+          <div className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37]/35 bg-white/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+              <div>
+                <span className="text-xs uppercase font-bold tracking-widest text-[#967223] block mb-1">
+                  Specialization Track Enrollments
+                </span>
+                <h3 className="text-xl font-bold text-[#151417]">Your Enrolled Core Tracks</h3>
+              </div>
+              <Link
+                href="/domains"
+                className="text-xs font-bold text-[#8C6B1B] hover:text-[#151417] inline-flex items-center gap-1"
+              >
+                <span>Browse All 7 Domains</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {isLoadingEnrollments ? (
+              <div className="p-8 text-center text-xs text-[#8A8592] animate-pulse">
+                Loading your track enrollment records...
+              </div>
+            ) : trackEnrollments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {trackEnrollments.map((enr) => {
+                  const domain = DOMAINS.find((d) => d.id === enr.domainId);
+                  const track = getTrackById(enr.trackId);
+                  return (
+                    <div
+                      key={enr.id}
+                      className="p-5 rounded-2xl bg-white border border-[#E8D8C3] hover:border-[#D4AF37]/60 shadow-xs transition-all space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#967223] block">
+                            {enr.domainName || domain?.name}
+                          </span>
+                          <h4 className="text-base font-bold text-[#151417] leading-snug">
+                            {enr.trackTitle}
+                          </h4>
+                        </div>
+                        {/* Status badge */}
+                        <div>
+                          {enr.status === 'approved' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Approved</span>
+                            </span>
+                          )}
+                          {enr.status === 'pending' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Pending Review</span>
+                            </span>
+                          )}
+                          {enr.status === 'rejected' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              <span>Not Approved</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-[#645E6D] space-y-1">
+                        <div className="flex items-center justify-between text-[#8A8592]">
+                          <span>Roll Number:</span>
+                          <span className="font-mono font-semibold text-[#151417]">{enr.rollNumber}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[#8A8592]">
+                          <span>Enrolled Date:</span>
+                          <span className="font-medium text-[#151417]">
+                            {new Date(enr.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {track?.description && (
+                        <p className="text-xs text-[#55505C] line-clamp-2 pt-1 border-t border-[#E8D8C3]/50">
+                          {track.description}
+                        </p>
+                      )}
+
+                      <div className="pt-2 flex items-center justify-between">
+                        {domain ? (
+                          <Link
+                            href={`/domains/${domain.slug}#${enr.trackId}`}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-[#8C6B1B] hover:text-[#151417]"
+                          >
+                            <span>Open Track Hub</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        ) : (
+                          <span />
+                        )}
+                        <span className="text-[10px] text-[#8A8592] font-mono">
+                          ID: {enr.id.slice(0, 10)}...
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center rounded-2xl bg-[#FAF7F2] border border-[#E8D8C3] space-y-3">
+                <Shield className="w-8 h-8 text-[#C89D3C] mx-auto opacity-70" />
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-[#151417]">No Core Tracks Enrolled Yet</h4>
+                  <p className="text-xs text-[#645E6D] max-w-md mx-auto">
+                    Select a specialization track within any of the 7 cybersecurity domains to submit an enrollment request to club administration.
+                  </p>
+                </div>
+                <Link
+                  href="/domains"
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors"
+                >
+                  <span>Explore Domains & Tracks</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#E5C378]" />
+                </Link>
+              </div>
+            )}
+          </div>
+
           {/* Enrolled Domains Overview */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-[#151417]">Your Enrolled Domains</h3>
+              <h3 className="text-xl font-bold text-[#151417]">Your Domain Bookmarks</h3>
               <Link
                 href="/domains"
                 className="text-xs font-bold text-[#8C6B1B] hover:text-[#151417]"
               >
-                Manage Tracks →
+                Manage Domains →
               </Link>
             </div>
 
@@ -264,6 +500,200 @@ export default function StudentDashboardPage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tab: Dedicated Track Enrollments Management */}
+      {activeTab === 'tracks' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-bold text-[#151417]">My Enrolled Core Tracks</h3>
+              <p className="text-xs text-[#645E6D]">
+                Official specialization tracks recorded in the 0XNULL database.
+              </p>
+            </div>
+            <Link
+              href="/domains"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors shrink-0"
+            >
+              <span>Enroll in Another Track</span>
+              <ArrowRight className="w-3.5 h-3.5 text-[#E5C378]" />
+            </Link>
+          </div>
+
+          {isLoadingEnrollments ? (
+            <div className="py-16 text-center text-xs text-[#8A8592] glass-card rounded-2xl animate-pulse">
+              Loading your verified track enrollment records...
+            </div>
+          ) : trackEnrollments.length > 0 ? (
+            <div className="space-y-6">
+              {trackEnrollments.map((enr) => {
+                const domain = DOMAINS.find((d) => d.id === enr.domainId);
+                const track = getTrackById(enr.trackId);
+                return (
+                  <div
+                    key={enr.id}
+                    className="glass-card rounded-3xl p-6 sm:p-8 border-[#D4AF37]/35 bg-white space-y-5"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#E8D8C3]/60">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-xs font-bold text-[#967223] uppercase">
+                            {enr.domainName || domain?.name}
+                          </span>
+                          {track?.level && (
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#FAF7F2] text-[#8C6B1B] border border-[#E8D8C3]">
+                              {track.level}
+                            </span>
+                          )}
+                          {track?.durationWeeks && (
+                            <span className="text-[10px] font-mono text-[#8A8592]">
+                              {track.durationWeeks} Weeks
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-2xl font-black text-[#151417]">{enr.trackTitle}</h4>
+                      </div>
+
+                      {/* Status Display */}
+                      <div className="shrink-0 flex items-center gap-3">
+                        {enr.status === 'approved' && (
+                          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-left">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>Approved Enrollment</span>
+                            </div>
+                            <p className="text-[11px] text-emerald-700 mt-0.5">
+                              {enr.reviewedAt
+                                ? `Reviewed ${new Date(enr.reviewedAt).toLocaleDateString()}`
+                                : 'Active access to track labs & mentors'}
+                            </p>
+                          </div>
+                        )}
+                        {enr.status === 'pending' && (
+                          <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-left">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wider">
+                              <Clock className="w-4 h-4 text-amber-600" />
+                              <span>Pending Review</span>
+                            </div>
+                            <p className="text-[11px] text-amber-700 mt-0.5">
+                              Submitted to administration. Awaiting mentor approval.
+                            </p>
+                          </div>
+                        )}
+                        {enr.status === 'rejected' && (
+                          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-left">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-rose-800 uppercase tracking-wider">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" />
+                              <span>Not Approved</span>
+                            </div>
+                            <p className="text-[11px] text-rose-700 mt-0.5">
+                              Contact department lead or select an alternate track.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {track?.description && (
+                      <p className="text-xs sm:text-sm text-[#55505C] leading-relaxed">
+                        {track.description}
+                      </p>
+                    )}
+
+                    {/* Competencies & Deliverables Grid */}
+                    {(() => {
+                      const competenciesList = track?.competencies || track?.topics || [];
+                      const deliverablesList = track?.deliverables || (track?.deliverable ? [track.deliverable] : []);
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          {competenciesList.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8D8C3] space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#967223] block">
+                                Target Competencies
+                              </span>
+                              <ul className="space-y-1.5 text-xs text-[#151417]">
+                                {competenciesList.map((comp: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#C89D3C] mt-1.5 shrink-0" />
+                                    <span>{comp}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {deliverablesList.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E8D8C3] space-y-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#967223] block">
+                                Milestones & Deliverables
+                              </span>
+                              <ul className="space-y-1.5 text-xs text-[#151417]">
+                                {deliverablesList.map((deliv: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#8C6B1B] mt-1.5 shrink-0" />
+                                    <span>{deliv}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Registration Meta details */}
+                    <div className="p-4 rounded-2xl bg-white border border-[#E8D8C3] flex flex-wrap items-center justify-between gap-4 text-xs">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#8A8592] block">
+                          Candidate Details
+                        </span>
+                        <p className="font-semibold text-[#151417]">
+                          {enr.fullName} • <span className="font-mono">{enr.rollNumber}</span> ({enr.year}, {enr.branch})
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {domain && (
+                          <Link
+                            href={`/domains/${domain.slug}#${enr.trackId}`}
+                            className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#FAF7F2] border border-[#E8D8C3] text-[#8C6B1B] hover:bg-[#F5EBDD] transition-colors"
+                          >
+                            Track Curriculum →
+                          </Link>
+                        )}
+                        <Link
+                          href="/resources"
+                          className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-white border border-[#E8D8C3] text-[#151417] hover:bg-[#FAF7F2] transition-colors"
+                        >
+                          Domain Resources
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-16 text-center text-[#8A8592] glass-card rounded-2xl space-y-3">
+              <Shield className="w-10 h-10 mx-auto opacity-40 text-[#C89D3C]" />
+              <div className="space-y-1">
+                <p className="font-bold text-sm text-[#151417]">No Track Enrollments Recorded</p>
+                <p className="text-xs text-[#645E6D] max-w-sm mx-auto">
+                  Browse our seven specialized cybersecurity domains and enroll in one of our core tracks to begin hands-on mentorship.
+                </p>
+              </div>
+              <Link
+                href="/domains"
+                className="mt-3 inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors"
+              >
+                <span>Browse Domains & Tracks</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[#E5C378]" />
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

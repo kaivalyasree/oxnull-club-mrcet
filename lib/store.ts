@@ -4,6 +4,8 @@ import {
   DOMAINS,
   LEARNING_SUBJECTS,
   Domain,
+  DomainTrack,
+  getAllTracks,
   LearningSubject,
   Resource,
   Certification,
@@ -11,6 +13,12 @@ import {
   Activity,
   Announcement
 } from './data';
+
+export interface ExploreTaskProgress {
+  status: 'not_started' | 'in_progress' | 'completed';
+  submission?: string;
+  updatedAt?: string;
+}
 
 export interface UserProgressData {
   userId: string;
@@ -21,6 +29,8 @@ export interface UserProgressData {
   activeProjectIds: string[];
   rsvpdActivityIds: string[];
   completedFoundationIds: string[];
+  completedExploreTaskIds?: string[];
+  exploreTaskSubmissions?: Record<string, ExploreTaskProgress>;
   notes: string;
 }
 
@@ -38,8 +48,34 @@ export interface ClubApplication {
   updatedAt: string;
 }
 
+export interface TrackEnrollment {
+  id: string;
+  userId: string;
+  studentName: string;
+  fullName?: string;
+  studentEmail: string;
+  email?: string;
+  rollNumber: string;
+  academicYear: string;
+  year?: string;
+  branch: string;
+  phoneNumber: string;
+  domainId: string;
+  domainName: string;
+  trackId: string;
+  trackName: string;
+  trackTitle?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  statement?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface StoreSchema {
   domains: Domain[];
+  customTracks?: DomainTrack[];
   learningSubjects: LearningSubject[];
   resources: Resource[];
   certifications: Certification[];
@@ -47,6 +83,7 @@ export interface StoreSchema {
   activities: Activity[];
   announcements: Announcement[];
   applications: ClubApplication[];
+  trackEnrollments: TrackEnrollment[];
   userProgress: Record<string, UserProgressData>;
 }
 
@@ -61,6 +98,7 @@ function ensureDataFile(): StoreSchema {
   if (!fs.existsSync(DB_FILE)) {
     const initialData: StoreSchema = {
       domains: DOMAINS,
+      customTracks: [],
       learningSubjects: LEARNING_SUBJECTS,
       resources: [],
       certifications: [],
@@ -68,6 +106,7 @@ function ensureDataFile(): StoreSchema {
       activities: [],
       announcements: [],
       applications: [],
+      trackEnrollments: [],
       userProgress: {}
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -78,6 +117,8 @@ function ensureDataFile(): StoreSchema {
     const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(fileContent) as StoreSchema;
     if (!parsed.applications) parsed.applications = [];
+    if (!parsed.trackEnrollments) parsed.trackEnrollments = [];
+    if (!parsed.customTracks) parsed.customTracks = [];
     if (!parsed.domains || parsed.domains.length === 0) parsed.domains = DOMAINS;
     if (!parsed.learningSubjects || parsed.learningSubjects.length === 0) parsed.learningSubjects = LEARNING_SUBJECTS;
     if (!parsed.resources) parsed.resources = [];
@@ -91,6 +132,7 @@ function ensureDataFile(): StoreSchema {
     console.error('Error reading db.json, returning empty defaults', error);
     return {
       domains: DOMAINS,
+      customTracks: [],
       learningSubjects: LEARNING_SUBJECTS,
       resources: [],
       certifications: [],
@@ -98,6 +140,7 @@ function ensureDataFile(): StoreSchema {
       activities: [],
       announcements: [],
       applications: [],
+      trackEnrollments: [],
       userProgress: {}
     };
   }
@@ -123,9 +166,13 @@ export const db = {
   getDomains(): Domain[] {
     const store = ensureDataFile();
     const list = store.domains && store.domains.length > 0 ? store.domains : DOMAINS;
+    const custom = store.customTracks || [];
     return list.map((storedItem) => {
       const base = DOMAINS.find((d) => d.slug === storedItem.slug || d.id === storedItem.id);
-      return base ? { ...base, ...storedItem } : storedItem;
+      const merged = base ? { ...base, ...storedItem } : storedItem;
+      const domainCustom = custom.filter((t) => t.domainId === merged.id || t.domainSlug === merged.slug);
+      const combinedTracks = [...(merged.tracks || []), ...domainCustom];
+      return { ...merged, tracks: combinedTracks };
     });
   },
   getDomainBySlug(slug: string): Domain | undefined {
@@ -134,7 +181,10 @@ export const db = {
     const found = list.find((d) => d.slug === slug || d.id === slug);
     if (!found) return undefined;
     const base = DOMAINS.find((d) => d.slug === slug || d.id === slug);
-    return base ? { ...base, ...found } : found;
+    const merged = base ? { ...base, ...found } : found;
+    const custom = (store.customTracks || []).filter((t) => t.domainId === merged.id || t.domainSlug === merged.slug);
+    const combinedTracks = [...(merged.tracks || []), ...custom];
+    return { ...merged, tracks: combinedTracks };
   },
   updateDomain(slug: string, updated: Partial<Domain>): Domain | null {
     const store = ensureDataFile();
@@ -431,9 +481,18 @@ export const db = {
         activeProjectIds: [],
         rsvpdActivityIds: [],
         completedFoundationIds: [],
+        completedExploreTaskIds: [],
+        exploreTaskSubmissions: {},
         notes: ''
       };
       writeDataFile(store);
+    } else {
+      if (!store.userProgress[userId].completedExploreTaskIds) {
+        store.userProgress[userId].completedExploreTaskIds = [];
+      }
+      if (!store.userProgress[userId].exploreTaskSubmissions) {
+        store.userProgress[userId].exploreTaskSubmissions = {};
+      }
     }
     return store.userProgress[userId];
   },
@@ -448,10 +507,169 @@ export const db = {
       activeProjectIds: [],
       rsvpdActivityIds: [],
       completedFoundationIds: [],
+      completedExploreTaskIds: [],
+      exploreTaskSubmissions: {},
       notes: ''
     };
     store.userProgress[userId] = { ...existing, ...data };
     writeDataFile(store);
     return store.userProgress[userId];
+  },
+
+  // Track Enrollments
+  getEnrollments(options?: { domainId?: string; trackId?: string; status?: string }): TrackEnrollment[] {
+    let list = ensureDataFile().trackEnrollments || [];
+    if (options?.domainId && options.domainId !== 'all') {
+      list = list.filter((e) => e.domainId === options.domainId);
+    }
+    if (options?.trackId && options.trackId !== 'all') {
+      list = list.filter((e) => e.trackId === options.trackId);
+    }
+    if (options?.status && options.status !== 'all') {
+      list = list.filter((e) => e.status === options.status);
+    }
+    return list;
+  },
+  getEnrollmentsByUserId(userId: string): TrackEnrollment[] {
+    return (ensureDataFile().trackEnrollments || []).filter((e) => e.userId === userId);
+  },
+  getEnrollmentsByRollNumber(rollNumber: string): TrackEnrollment[] {
+    const cleanRoll = rollNumber.trim().toUpperCase();
+    return (ensureDataFile().trackEnrollments || []).filter(
+      (e) => e.rollNumber.trim().toUpperCase() === cleanRoll
+    );
+  },
+  getEnrollmentById(id: string): TrackEnrollment | undefined {
+    return (ensureDataFile().trackEnrollments || []).find((e) => e.id === id);
+  },
+  createEnrollment(data: Omit<TrackEnrollment, 'id' | 'status' | 'createdAt' | 'updatedAt'>): TrackEnrollment {
+    const store = ensureDataFile();
+    if (!store.trackEnrollments) store.trackEnrollments = [];
+
+    const now = new Date().toISOString();
+    const newEnrollment: TrackEnrollment = {
+      ...data,
+      studentName: data.studentName || data.fullName || 'Student',
+      fullName: data.fullName || data.studentName || 'Student',
+      studentEmail: data.studentEmail || data.email || '',
+      email: data.email || data.studentEmail || '',
+      academicYear: data.academicYear || data.year || '',
+      year: data.year || data.academicYear || '',
+      trackName: data.trackName || data.trackTitle || 'Track',
+      trackTitle: data.trackTitle || data.trackName || 'Track',
+      id: `enr-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    store.trackEnrollments.unshift(newEnrollment);
+
+    // Also link domain to user progress enrolledDomains if not already present
+    if (data.userId && store.userProgress[data.userId]) {
+      if (!store.userProgress[data.userId].enrolledDomains.includes(data.domainId)) {
+        store.userProgress[data.userId].enrolledDomains.push(data.domainId);
+      }
+    }
+
+    writeDataFile(store);
+    return newEnrollment;
+  },
+  updateEnrollmentStatus(id: string, status: TrackEnrollment['status'], reviewedBy?: string): TrackEnrollment | null {
+    const store = ensureDataFile();
+    if (!store.trackEnrollments) return null;
+    const index = store.trackEnrollments.findIndex((e) => e.id === id);
+    if (index === -1) return null;
+
+    const now = new Date().toISOString();
+    store.trackEnrollments[index].status = status;
+    store.trackEnrollments[index].updatedAt = now;
+    if (reviewedBy) {
+      store.trackEnrollments[index].reviewedBy = reviewedBy;
+      store.trackEnrollments[index].reviewedAt = now;
+    }
+    writeDataFile(store);
+    return store.trackEnrollments[index];
+  },
+
+  // Custom Core Track Management
+  getTracks(domainId?: string): DomainTrack[] {
+    const store = ensureDataFile();
+    const baseTracks = getAllTracks();
+    const custom = store.customTracks || [];
+    let all = [...baseTracks];
+
+    // Merge or override custom tracks
+    for (const c of custom) {
+      const existingIdx = all.findIndex((t) => t.id === c.id);
+      if (existingIdx !== -1) {
+        all[existingIdx] = c;
+      } else {
+        all.push(c);
+      }
+    }
+
+    if (domainId && domainId !== 'all') {
+      all = all.filter((t) => t.domainId === domainId || t.domainSlug === domainId);
+    }
+    return all;
+  },
+  addTrack(track: Omit<DomainTrack, 'id'>): DomainTrack {
+    const store = ensureDataFile();
+    if (!store.customTracks) store.customTracks = [];
+    const newTrack: DomainTrack = {
+      ...track,
+      id: `track-${Date.now()}`,
+      isActive: track.isActive !== false
+    };
+    store.customTracks.push(newTrack);
+    writeDataFile(store);
+    return newTrack;
+  },
+  updateTrack(id: string, updated: Partial<DomainTrack>): DomainTrack | null {
+    const store = ensureDataFile();
+    if (!store.customTracks) store.customTracks = [];
+    const customIndex = store.customTracks.findIndex((t) => t.id === id);
+    if (customIndex !== -1) {
+      store.customTracks[customIndex] = { ...store.customTracks[customIndex], ...updated };
+      writeDataFile(store);
+      return store.customTracks[customIndex];
+    }
+    // If it's a base track, store an override in customTracks
+    const base = getAllTracks().find((t) => t.id === id);
+    if (!base) return null;
+    const overridden: DomainTrack = { ...base, ...updated };
+    store.customTracks.push(overridden);
+    writeDataFile(store);
+    return overridden;
+  },
+  deleteTrack(id: string): { success: boolean; error?: string } {
+    const store = ensureDataFile();
+    // Check referential integrity: are any students enrolled in this track?
+    const enrollments = store.trackEnrollments || [];
+    const hasEnrollments = enrollments.some((e) => e.trackId === id);
+    if (hasEnrollments) {
+      return {
+        success: false,
+        error: 'Cannot delete track: active student enrollments exist for this track. Please deactivate it instead to protect student records.'
+      };
+    }
+    if (store.customTracks) {
+      const beforeLen = store.customTracks.length;
+      store.customTracks = store.customTracks.filter((t) => t.id !== id);
+      if (store.customTracks.length !== beforeLen) {
+        writeDataFile(store);
+        return { success: true };
+      }
+    }
+    // If it is a predefined base track, mark as deactivated
+    const base = getAllTracks().find((t) => t.id === id);
+    if (base) {
+      if (!store.customTracks) store.customTracks = [];
+      store.customTracks.push({ ...base, isActive: false });
+      writeDataFile(store);
+      return { success: true };
+    }
+    return { success: false, error: 'Track not found.' };
   }
 };

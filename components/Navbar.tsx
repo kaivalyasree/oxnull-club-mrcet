@@ -18,12 +18,14 @@ import {
   Layers,
   User,
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  ArrowLeftRight,
+  LogOut
 } from 'lucide-react';
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, switchAccount } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -169,7 +171,7 @@ export default function Navbar() {
 
             {/* Join the Club Action */}
             <Link
-              href="/join"
+              href="/domains"
               className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] border border-[#D4AF37]/40 shadow-2xs transition-all hover:scale-[1.02]"
             >
               <span>Join the Club</span>
@@ -177,14 +179,30 @@ export default function Navbar() {
 
             {/* Auth / Dashboard link */}
             {user ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Link
                   href="/dashboard"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#151417] text-[#FAF7F2] hover:bg-[#2A2830] transition-colors shadow-2xs"
+                  title={`Logged in as ${user.email}`}
                 >
                   <User className="w-3.5 h-3.5 text-[#E5C378]" />
-                  <span>Dashboard</span>
+                  <span className="hidden sm:inline">{user.name ? user.name.split(' ')[0] : 'Portal'}</span>
+                  <span className="sm:hidden">Portal</span>
                 </Link>
+                <button
+                  onClick={() => switchAccount()}
+                  className="hidden md:inline-flex p-1.5 rounded-full border border-[#E8D8C3] bg-white text-[#8C6B1B] hover:bg-[#FAF7F2] hover:border-[#C89D3C] transition-all cursor-pointer"
+                  title="Switch Account"
+                >
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => logout()}
+                  className="hidden md:inline-flex p-1.5 rounded-full border border-[#E8D8C3] bg-white text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-all cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
               <Link
@@ -280,7 +298,7 @@ export default function Navbar() {
             {/* Bottom Actions inside drawer */}
             <div className="pt-6 border-t border-[#E8D8C3] space-y-3">
               <Link
-                href="/join"
+                href="/domains"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full py-2.5 px-3 rounded-xl bg-[#151417] text-[#FAF7F2] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs"
               >
@@ -300,6 +318,11 @@ export default function Navbar() {
 
               {user ? (
                 <div className="space-y-2">
+                  <div className="px-3 py-2 rounded-xl bg-[#FAF7F2] border border-[#E8D8C3]">
+                    <p className="text-[10px] uppercase font-bold text-[#967223]">Authenticated Student</p>
+                    <p className="text-xs font-bold text-[#151417] truncate">{user.name || user.email}</p>
+                    <p className="text-[11px] text-[#645E6D] truncate">{user.email}</p>
+                  </div>
                   <Link
                     href="/dashboard"
                     onClick={() => setMobileMenuOpen(false)}
@@ -310,12 +333,23 @@ export default function Navbar() {
                   </Link>
                   <button
                     onClick={() => {
+                      setMobileMenuOpen(false);
+                      switchAccount();
+                    }}
+                    className="w-full py-2 px-3 rounded-xl border border-[#E8D8C3] bg-white text-xs font-semibold text-[#8C6B1B] hover:bg-[#FAF7F2] flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>Switch Account</span>
+                  </button>
+                  <button
+                    onClick={() => {
                       logout();
                       setMobileMenuOpen(false);
                     }}
-                    className="w-full py-2 text-xs font-medium text-[#8A8592] hover:text-rose-700 transition-colors"
+                    className="w-full py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    Sign Out
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
                   </button>
                 </div>
               ) : (
