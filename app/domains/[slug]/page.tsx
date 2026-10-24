@@ -8,7 +8,7 @@ import CertificationCard from '@/components/CertificationCard';
 import ProjectCard from '@/components/ProjectCard';
 import { DOMAINS, Domain } from '@/lib/data';
 import { db } from '@/lib/store';
-import AwarenessIntelligenceSection from '@/components/AwarenessIntelligenceSection';
+import AwarenessDomainView from '@/components/AwarenessDomainView';
 import ExploreModulesSection from '@/components/ExploreModulesSection';
 import {
   BookOpen,
@@ -48,6 +48,12 @@ export default async function DomainDetailPage({
 
   if (!domain) {
     notFound();
+  }
+
+  // Awareness Domain: Render modern public news, advisories & scam awareness view
+  if (domain.slug === 'awareness') {
+    const awarenessArticles = db.getAwarenessArticles({ publishedOnly: true });
+    return <AwarenessDomainView domain={domain} initialArticles={awarenessArticles} />;
   }
 
   // Filter domain-specific published items from backend database store
@@ -111,10 +117,7 @@ export default async function DomainDetailPage({
         </section>
 
         {/* Domain Custom Modules / Living Library */}
-        {domain.slug === 'awareness' ? (
-          /* Awareness Intelligence Modules: Latest Scans, Tech News, Threat Watch, Security Advisories */
-          <AwarenessIntelligenceSection />
-        ) : domain.slug === 'explore' ? (
+        {domain.slug === 'explore' ? (
           /* Explore Non-Technical Development Modules: Communication, PR, Networking, Leadership & Collaboration, Planning & Operations */
           <ExploreModulesSection />
         ) : (

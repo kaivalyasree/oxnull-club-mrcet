@@ -26,6 +26,7 @@ export type AdminTab =
   | 'enrollments'
   | 'students'
   | 'domains-tracks'
+  | 'awareness'
   | 'resources'
   | 'certifications'
   | 'projects'
@@ -96,6 +97,12 @@ export default function AdminSidebar({
     {
       group: 'Curriculum & Content',
       items: [
+        {
+          id: 'awareness' as AdminTab,
+          label: 'Awareness CMS',
+          icon: ShieldAlert,
+          badge: 'News & Scams'
+        },
         {
           id: 'subjects' as AdminTab,
           label: 'Learn Subjects',

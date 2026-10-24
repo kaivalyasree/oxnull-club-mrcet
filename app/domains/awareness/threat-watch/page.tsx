@@ -101,7 +101,7 @@ export default function ThreatWatchPage() {
           </div>
           <div>
             <span className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase text-[#967223]">
-              Module 03 · Situational Intelligence
+              OXNULL Awareness Initiative · Threat Telemetry
             </span>
             <h1 className="text-3xl sm:text-4xl font-black text-[#151417] tracking-tight">
               Threat Watch

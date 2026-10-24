@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Domain } from '@/lib/data';
 import { useAuth } from '@/lib/auth-context';
 import { ShieldCheck, Plus, Check, ArrowLeft, BookOpen, Award, FolderGit2, Compass, Layers, Clock } from 'lucide-react';
+import AwarenessHero from './AwarenessHero';
 
 interface DomainHeroProps {
   domain: Domain;
@@ -19,6 +20,11 @@ export default function DomainHero({
   enrolledTrackName,
   enrollmentStatus
 }: DomainHeroProps) {
+  // If Awareness domain, render the dedicated public awareness hero (no enrollments, no tracks)
+  if (domain.slug === 'awareness') {
+    return <AwarenessHero domain={domain} />;
+  }
+
   const { user, progress, toggleEnrollDomain } = useAuth();
   const isEnrolledBookmark = progress.enrolledDomains.includes(domain.id);
   const isEnrolled = Boolean(enrollmentStatus || isEnrolledBookmark);
@@ -139,34 +145,7 @@ export default function DomainHero({
             Focus Areas
           </a>
 
-          {domain.slug === 'awareness' ? (
-            <>
-              <a
-                href="#scans"
-                className="px-3 py-1.5 rounded-full hover:bg-[#F5EBDD] hover:text-[#151417] transition-colors whitespace-nowrap flex items-center gap-1.5"
-              >
-                <span>Latest Scans</span>
-              </a>
-              <a
-                href="#tech-news"
-                className="px-3 py-1.5 rounded-full hover:bg-[#F5EBDD] hover:text-[#151417] transition-colors whitespace-nowrap flex items-center gap-1.5"
-              >
-                <span>Tech News</span>
-              </a>
-              <a
-                href="#threat-watch"
-                className="px-3 py-1.5 rounded-full hover:bg-[#F5EBDD] hover:text-[#151417] transition-colors whitespace-nowrap flex items-center gap-1.5"
-              >
-                <span>Threat Watch</span>
-              </a>
-              <a
-                href="#advisories"
-                className="px-3 py-1.5 rounded-full hover:bg-[#F5EBDD] hover:text-[#151417] transition-colors whitespace-nowrap flex items-center gap-1.5"
-              >
-                <span>Advisories</span>
-              </a>
-            </>
-          ) : domain.slug === 'explore' ? (
+          {domain.slug === 'explore' ? (
             <>
               <a
                 href="#explore-modules"

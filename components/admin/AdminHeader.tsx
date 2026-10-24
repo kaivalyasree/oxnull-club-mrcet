@@ -37,7 +37,11 @@ export default function AdminHeader({
     },
     'domains-tracks': {
       title: 'Domains & Core Learning Tracks',
-      subtitle: 'Manage the seven cybersecurity domains and inner specialized tracks'
+      subtitle: 'Manage the six specialized tracks across technical domains'
+    },
+    awareness: {
+      title: 'Awareness CMS & Scam Alerts',
+      subtitle: 'Publish weekly technology news, fortnightly cyber updates, and scam exposure guides'
     },
     subjects: {
       title: 'Foundational Learning Subjects',

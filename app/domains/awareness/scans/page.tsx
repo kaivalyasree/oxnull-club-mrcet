@@ -74,7 +74,7 @@ export default function LatestScansPage() {
           </div>
           <div>
             <span className="text-[10px] font-mono font-bold tracking-[0.2em] uppercase text-[#967223]">
-              Module 01 · Situational Intelligence
+              OXNULL Awareness Initiative · Diagnostic Telemetry
             </span>
             <h1 className="text-3xl sm:text-4xl font-black text-[#151417] tracking-tight">
               Latest Security Scans

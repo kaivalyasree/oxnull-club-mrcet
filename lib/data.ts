@@ -174,16 +174,13 @@ export const DOMAINS: Domain[] = [
     slug: 'awareness',
     number: '01',
     name: 'Awareness',
-    badge: 'Human & Threat Landscape',
-    tagline: 'Reading the threat landscape as it actually moves — beyond sensational headlines, into the mechanics of phishing, social engineering, malware, and emerging attack vectors.',
-    overview: 'The human element remains the primary attack surface across modern breaches. The Awareness domain equips members with critical intelligence to deconstruct spear-phishing campaigns, behavioral psychology, ransomware economics, and digital privacy.',
+    badge: 'Public Awareness & Intelligence',
+    tagline: 'Discover the latest technology developments, understand important cybersecurity incidents, and learn how trending scams operate.',
+    overview: 'OXNULL Awareness is an information-sharing and public-awareness initiative for our campus community. We provide regular weekly technology news, fortnightly cybersecurity intelligence roundups, and practical scam awareness guides to help students and the public recognize emerging cyber threats, spot deceptive tactics, and make safer digital decisions.',
     focusAreas: [
-      'Cybersecurity intelligence & active global threat campaigns',
-      'Online scams, spear-phishing, business email compromise (BEC)',
-      'Social engineering behavioral patterns & cognitive biases',
-      'Malware families, ransomware payloads, and extortion schemes',
-      'Digital privacy, consumer data rights, and surveillance technologies',
-      'Emerging attack vectors (voice clones, deepfakes, QR code phishing)'
+      'Weekly Technology News & Computing Developments',
+      'Fortnightly Cybersecurity Incidents & Vulnerability Roundups',
+      'Scam Awareness, Red Flags & Public Fraud Exposure'
     ],
     tracks: [
       {

@@ -22,6 +22,11 @@ interface DomainTracksSectionProps {
 }
 
 export default function DomainTracksSection({ domain, initialTrackId }: DomainTracksSectionProps) {
+  // Awareness domain is an information and public-awareness initiative, not a training/tracks domain
+  if (domain.slug === 'awareness') {
+    return null;
+  }
+
   const { user } = useAuth();
   const [selectedTrack, setSelectedTrack] = useState<DomainTrack | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -13,7 +13,7 @@ import {
   Activity,
   Announcement
 } from '@/lib/data';
-import type { ClubApplication, TrackEnrollment } from '@/lib/store';
+import type { ClubApplication, TrackEnrollment, AwarenessArticle } from '@/lib/store';
 import {
   ShieldCheck,
   Plus,
@@ -57,6 +57,7 @@ import AdminDashboardOverview from '@/components/admin/AdminDashboardOverview';
 import AdminEnrollmentManager from '@/components/admin/AdminEnrollmentManager';
 import AdminStudentManager from '@/components/admin/AdminStudentManager';
 import AdminTrackManager from '@/components/admin/AdminTrackManager';
+import AdminAwarenessManager from '@/components/admin/AdminAwarenessManager';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
@@ -87,6 +88,7 @@ export default function AdminPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [subjects, setSubjects] = useState<LearningSubject[]>(LEARNING_SUBJECTS);
   const [domainsList, setDomainsList] = useState<Domain[]>(DOMAINS);
+  const [awarenessArticles, setAwarenessArticles] = useState<AwarenessArticle[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -230,7 +232,8 @@ export default function AdminPage() {
         resDoms,
         resEnrs,
         resStuds,
-        resTracks
+        resTracks,
+        resAwArticles
       ] = await Promise.all([
         fetch('/api/applications').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/resources?all=true').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
@@ -242,12 +245,16 @@ export default function AdminPage() {
         fetch('/api/domains').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/enrollments').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
         fetch('/api/admin/students').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
-        fetch('/api/tracks').then((r) => r.json()).catch(() => ({ success: false, data: [] }))
+        fetch('/api/tracks').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
+        fetch('/api/awareness/articles?all=true').then((r) => r.json()).catch(() => ({ success: false, data: [] }))
       ]);
 
       if (resApps.success) setApplications(resApps.data);
       if (resR.success) setResources(resR.data);
       if (resP.success) setProjects(resP.data);
+      if (resAwArticles?.success && Array.isArray(resAwArticles.data)) {
+        setAwarenessArticles(resAwArticles.data);
+      }
       if (resC.success) setCertifications(resC.data);
       if (resA.success) setActivities(resA.data);
       if (resAnn.success) setAnnouncements(resAnn.data);
@@ -1215,6 +1222,15 @@ export default function AdminPage() {
               onSaveTrack={handleSaveTrack}
               onDeleteTrack={handleDeleteTrack}
               onEditDomain={(dom) => openEditDomainModal(dom)}
+              showToast={showToast}
+            />
+          )}
+
+          {/* SECTION: AWARENESS ARTICLES & SCAM CMS */}
+          {activeTab === 'awareness' && (
+            <AdminAwarenessManager
+              articles={awarenessArticles}
+              onRefresh={loadAllData}
               showToast={showToast}
             />
           )}

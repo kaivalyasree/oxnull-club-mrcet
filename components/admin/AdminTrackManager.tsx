@@ -221,8 +221,12 @@ export default function AdminTrackManager({
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#E8D8C3]/50 flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-[#8C6B1B] font-semibold">{domainTrackCount} Tracks</span>
-                  <span className="text-[#8A8592]">{domainEnrollmentCount} Enrolled</span>
+                  <span className="text-[#8C6B1B] font-semibold">
+                    {dom.slug === 'awareness' ? 'News & Scam CMS' : `${domainTrackCount} Tracks`}
+                  </span>
+                  <span className="text-[#8A8592]">
+                    {dom.slug === 'awareness' ? 'Public Initiative' : `${domainEnrollmentCount} Enrolled`}
+                  </span>
                 </div>
               </div>
             );

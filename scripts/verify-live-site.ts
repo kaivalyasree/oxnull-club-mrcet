@@ -80,29 +80,40 @@ async function runLiveVerification() {
   assert(resSwitch.status === 200, 'Switch Account page returns HTTP 200');
 
   // ===========================================================================
-  // GROUP 3: Awareness Domain & 4 Situational Intelligence Modules
+  // GROUP 3: Awareness Domain & Three Editorial Sections (Weekly Tech, Cyber News, Scam Exposure)
   // ===========================================================================
-  console.log('\n--- VERIFICATION GROUP 3: Awareness Domain & 4 Intelligence Modules ---');
+  console.log('\n--- VERIFICATION GROUP 3: Redesigned Awareness Domain & Editorial Sections ---');
   const resAwareness = await fetch(`${baseUrl}/domains/awareness`);
   assert(resAwareness.status === 200, 'Awareness domain returns HTTP 200');
   const awarenessHtml = await resAwareness.text();
   assert(
-    awarenessHtml.includes('Cybersecurity Intelligence & Threat Telemetry') ||
-    awarenessHtml.includes('Situational Intelligence Modules'),
-    'Awareness domain renders Situational Intelligence modules'
+    awarenessHtml.includes('Stay Informed. Stay Alert. Stay Safe.') &&
+    awarenessHtml.includes('OXNULL AWARENESS INITIATIVE'),
+    'Awareness domain renders redesigned hero with approved heading and eyebrow'
   );
   assert(
-    awarenessHtml.includes('Latest Scans') &&
-    awarenessHtml.includes('Cybersecurity Tech News') &&
-    awarenessHtml.includes('Threat Watch') &&
-    awarenessHtml.includes('Security Advisories'),
-    'Awareness domain contains all 4 intelligence hubs'
+    awarenessHtml.includes('Weekly Tech News') &&
+    awarenessHtml.includes('Fortnightly Cybersecurity Updates') &&
+    (awarenessHtml.includes('Scam Awareness &amp; Exposure') || awarenessHtml.includes('Scam Awareness & Exposure')),
+    'Awareness domain renders all three concise category indicators'
   );
   assert(
-    !awarenessHtml.includes('Domain Resources') &&
-    !awarenessHtml.includes('Industry Certifications Roadmap') &&
-    !awarenessHtml.includes('Member-Led Security Projects'),
-    'Awareness domain strictly removes Resources, Certifications, and Projects'
+    awarenessHtml.includes('Technology News') &&
+    awarenessHtml.includes('Cybersecurity News') &&
+    (awarenessHtml.includes('Scam Awareness &amp; Exposure') || awarenessHtml.includes('Scam Awareness & Exposure')),
+    'Awareness domain renders all three core content sections'
+  );
+  assert(
+    awarenessHtml.includes('1930') &&
+    awarenessHtml.includes('cybercrime.gov.in'),
+    'Scam Awareness section includes verified national emergency helpline (1930) and reporting portal'
+  );
+  assert(
+    !awarenessHtml.includes('Enroll in this Track') &&
+    !awarenessHtml.includes('Enroll in Core Tracks') &&
+    !awarenessHtml.includes('Recommended Learning Pathway') &&
+    !awarenessHtml.includes('Domain Resources'),
+    'Awareness domain strictly removes training-oriented tracks, enrollment CTAs, and learning pathways'
   );
 
   // Awareness Sub-Pages
@@ -144,6 +155,13 @@ async function runLiveVerification() {
   assert(
     scansData.success === true && scansData.hasActiveIntegration === false,
     'Scan API indicates unconfigured status in compliance with university policy'
+  );
+
+  const resApiArticles = await fetch(`${baseUrl}/api/awareness/articles`);
+  const articlesData = await resApiArticles.json();
+  assert(
+    articlesData.success === true && Array.isArray(articlesData.data) && articlesData.data.length >= 8,
+    'Awareness Articles API returns verified public articles across all three categories'
   );
 
   // ===========================================================================
